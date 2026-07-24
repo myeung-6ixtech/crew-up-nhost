@@ -1,0 +1,29 @@
+type Mutation {
+  parseRoster(fileId: uuid!): RosterParseResult!
+  submitReport(
+    reason: String!
+    details: String
+    reportedUserId: uuid
+    reportedMessageId: uuid
+    reportedEventId: uuid
+  ): SubmitReportOutput!
+}
+
+type RosterParseResult {
+  sourceFileId: uuid!
+  entries: [RosterParseEntry!]!
+}
+
+type RosterParseEntry {
+  flightNumber: String
+  departureAirport: String
+  arrivalAirport: String
+  layoverCity: String
+  layoverStart: timestamptz
+  layoverEnd: timestamptz
+}
+
+type SubmitReportOutput {
+  reportId: uuid!
+  status: String!
+}

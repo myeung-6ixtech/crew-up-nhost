@@ -1,0 +1,5 @@
+.nhost
+.secrets
+node_modules
+.DS_Store
+functions/node_modules

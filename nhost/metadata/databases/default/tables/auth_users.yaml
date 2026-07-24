@@ -1,0 +1,32 @@
+table:
+  name: users
+  schema: auth
+object_relationships:
+  - name: profile
+    using:
+      manual_configuration:
+        column_mapping:
+          id: user_id
+        insertion_order: null
+        remote_table:
+          name: profiles
+          schema: public
+array_relationships:
+  - name: roles
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: user_roles
+          schema: auth
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - display_name
+        - email
+        - avatar_url
+        - disabled
+        - default_role
+      filter: {}

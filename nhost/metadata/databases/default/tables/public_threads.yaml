@@ -1,0 +1,37 @@
+table:
+  name: threads
+  schema: public
+object_relationships:
+  - name: event
+    using:
+      foreign_key_constraint_on: event_id
+array_relationships:
+  - name: messages
+    using:
+      foreign_key_constraint_on:
+        column: thread_id
+        table:
+          name: messages
+          schema: public
+  - name: participants
+    using:
+      foreign_key_constraint_on:
+        column: thread_id
+        table:
+          name: thread_participants
+          schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        participants:
+          user_id:
+            _eq: X-Hasura-User-Id
+insert_permissions:
+  - role: user
+    permission:
+      check: {}
+      columns:
+        - type
+        - event_id

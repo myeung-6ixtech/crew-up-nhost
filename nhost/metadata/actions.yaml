@@ -1,0 +1,25 @@
+actions:
+  - name: parseRoster
+    definition:
+      kind: synchronous
+      handler: '{{NHOST_FUNCTIONS_URL}}/roster-parse'
+      forward_client_headers: true
+    permissions:
+      - role: user
+    comment: Parse uploaded roster file into structured layover entries for confirmation
+  - name: submitReport
+    definition:
+      kind: synchronous
+      handler: '{{NHOST_FUNCTIONS_URL}}/moderation-webhook'
+      forward_client_headers: true
+    permissions:
+      - role: user
+    comment: File safety report and notify moderation queue
+custom_types:
+  enums: []
+  input_objects: []
+  objects:
+    - name: RosterParseResult
+    - name: RosterParseEntry
+    - name: SubmitReportOutput
+  scalars: []

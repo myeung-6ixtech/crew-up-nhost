@@ -1,0 +1,71 @@
+table:
+  name: reports
+  schema: public
+object_relationships:
+  - name: reporter
+    using:
+      foreign_key_constraint_on: reporter_id
+  - name: reported_user
+    using:
+      foreign_key_constraint_on: reported_user_id
+  - name: reported_message
+    using:
+      foreign_key_constraint_on: reported_message_id
+  - name: reported_event
+    using:
+      foreign_key_constraint_on: reported_event_id
+  - name: resolver
+    using:
+      foreign_key_constraint_on: resolved_by
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - reporter_id
+        - status
+        - created_at
+      filter:
+        reporter_id:
+          _eq: X-Hasura-User-Id
+  - role: moderator
+    permission:
+      columns: '*'
+      filter: {}
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        reporter_id:
+          _eq: X-Hasura-User-Id
+      set:
+        reporter_id: X-Hasura-User-Id
+      columns:
+        - reported_user_id
+        - reported_message_id
+        - reported_event_id
+        - reason
+        - details
+update_permissions:
+  - role: moderator
+    permission:
+      columns:
+        - status
+        - resolution_notes
+        - resolved_by
+        - resolved_at
+      filter: {}
+      check: {}
+  - role: staff_admin
+    permission:
+      columns:
+        - status
+        - resolution_notes
+        - resolved_by
+        - resolved_at
+      filter: {}
+      check: {}

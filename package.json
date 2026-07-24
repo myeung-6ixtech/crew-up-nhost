@@ -1,0 +1,15 @@
+{
+  "name": "crew-up-nhost",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CrewUp backend — Nhost Postgres, Hasura GraphQL, Auth, Storage, Functions",
+  "scripts": {
+    "nhost:up": "nhost up",
+    "nhost:down": "nhost down",
+    "nhost:logs": "nhost logs",
+    "config:validate": "nhost config validate"
+  },
+  "devDependencies": {
+    "@nhost/cli": "^1.45.0"
+  }
+}

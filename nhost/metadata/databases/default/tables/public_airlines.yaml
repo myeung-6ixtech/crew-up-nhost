@@ -1,0 +1,33 @@
+table:
+  name: airlines
+  schema: public
+array_relationships:
+  - name: profiles
+    using:
+      foreign_key_constraint_on:
+        column: airline_id
+        table:
+          name: profiles
+          schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - id
+        - code
+        - name
+        - is_active
+      filter:
+        is_active:
+          _eq: true
+  - role: user
+    permission:
+      columns:
+        - id
+        - code
+        - name
+        - email_domains
+        - is_active
+      filter:
+        is_active:
+          _eq: true

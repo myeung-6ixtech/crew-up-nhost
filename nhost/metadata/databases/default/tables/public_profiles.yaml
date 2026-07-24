@@ -1,0 +1,110 @@
+table:
+  name: profiles
+  schema: public
+object_relationships:
+  - name: airline
+    using:
+      foreign_key_constraint_on: airline_id
+  - name: user
+    using:
+      foreign_key_constraint_on: user_id
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - display_name
+        - airline_id
+        - base_airport
+        - role_type
+        - show_rank
+        - preferred_language
+        - avatar_file_id
+        - is_verified
+        - created_at
+      filter:
+        _and:
+          - is_verified:
+              _eq: true
+          - user_id:
+              _neq: X-Hasura-User-Id
+  - role: user
+    permission:
+      columns:
+        - user_id
+        - display_name
+        - airline_id
+        - base_airport
+        - role_type
+        - rank
+        - show_rank
+        - preferred_language
+        - default_visibility
+        - notification_mode
+        - is_verified
+        - avatar_file_id
+        - created_at
+        - updated_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+  - role: moderator
+    permission:
+      columns:
+        - user_id
+        - display_name
+        - airline_id
+        - base_airport
+        - role_type
+        - is_verified
+      filter: {}
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+      set:
+        user_id: X-Hasura-User-Id
+      columns:
+        - display_name
+        - airline_id
+        - base_airport
+        - role_type
+        - rank
+        - show_rank
+        - preferred_language
+        - default_visibility
+        - notification_mode
+        - avatar_file_id
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - display_name
+        - airline_id
+        - base_airport
+        - role_type
+        - rank
+        - show_rank
+        - preferred_language
+        - default_visibility
+        - notification_mode
+        - avatar_file_id
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      columns:
+        - is_verified
+        - airline_id
+      filter: {}
+      check: {}

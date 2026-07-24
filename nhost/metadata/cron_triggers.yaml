@@ -1,0 +1,15 @@
+- name: notification_digest_daily
+  webhook: '{{NHOST_FUNCTIONS_URL}}/notification-dispatch'
+  schedule: 0 8 * * *
+  include_in_metadata: true
+  payload:
+    mode: digest
+  retry_conf:
+    num_retries: 3
+    retry_interval_seconds: 60
+    timeout_seconds: 120
+    tolerance_seconds: 21600
+  headers:
+    - name: nhost-webhook-secret
+      value_from_env: NHOST_WEBHOOK_SECRET
+  comment: Daily digest notifications for users with notification_mode=digest

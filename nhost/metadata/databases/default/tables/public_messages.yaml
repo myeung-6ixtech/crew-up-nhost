@@ -1,0 +1,50 @@
+table:
+  name: messages
+  schema: public
+object_relationships:
+  - name: sender
+    using:
+      foreign_key_constraint_on: sender_id
+  - name: thread
+    using:
+      foreign_key_constraint_on: thread_id
+event_triggers:
+  - name: messages_notify
+    definition:
+      enable_manual: false
+      insert:
+        columns: '*'
+    retry_conf:
+      interval_sec: 10
+      num_retries: 3
+      timeout_sec: 60
+    webhook: '{{NHOST_FUNCTIONS_URL}}/notification-dispatch'
+    headers:
+      - name: nhost-webhook-secret
+        value_from_env: NHOST_WEBHOOK_SECRET
+select_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        thread:
+          participants:
+            user_id:
+              _eq: X-Hasura-User-Id
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        _and:
+          - sender_id:
+              _eq: X-Hasura-User-Id
+          - thread:
+              participants:
+                user_id:
+                  _eq: X-Hasura-User-Id
+      set:
+        sender_id: X-Hasura-User-Id
+      columns:
+        - thread_id
+        - body
+        - media_file_id

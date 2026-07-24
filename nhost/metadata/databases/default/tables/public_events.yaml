@@ -1,0 +1,88 @@
+table:
+  name: events
+  schema: public
+object_relationships:
+  - name: creator
+    using:
+      foreign_key_constraint_on: creator_id
+array_relationships:
+  - name: attendees
+    using:
+      foreign_key_constraint_on:
+        column: event_id
+        table:
+          name: event_attendees
+          schema: public
+  - name: thread
+    using:
+      manual_configuration:
+        column_mapping:
+          id: event_id
+        insertion_order: null
+        remote_table:
+          name: threads
+          schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        _or:
+          - visibility_scope:
+              _eq: all_verified
+          - _and:
+              - visibility_scope:
+                  _eq: same_airline
+              - creator:
+                  profile:
+                    airline_id:
+                      _eq: X-Hasura-Airline-Id
+          - creator_id:
+              _eq: X-Hasura-User-Id
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        creator_id:
+          _eq: X-Hasura-User-Id
+      set:
+        creator_id: X-Hasura-User-Id
+      columns:
+        - title
+        - description
+        - city
+        - venue_name
+        - venue_address
+        - starts_at
+        - ends_at
+        - capacity
+        - visibility_scope
+        - tags
+        - languages
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - title
+        - description
+        - city
+        - venue_name
+        - venue_address
+        - starts_at
+        - ends_at
+        - capacity
+        - visibility_scope
+        - tags
+        - languages
+      filter:
+        creator_id:
+          _eq: X-Hasura-User-Id
+      check:
+        creator_id:
+          _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        creator_id:
+          _eq: X-Hasura-User-Id
