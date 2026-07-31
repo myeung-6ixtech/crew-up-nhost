@@ -40,6 +40,8 @@ mode = 'disabled'
 
 [auth.redirections]
 clientUrl = 'http://localhost:3000'
+# Mobile deep links after OAuth (Expo scheme: crewup)
+allowedUrls = ['crewup://', 'exp://']
 
 [auth.signUp]
 enabled = true
@@ -128,7 +130,9 @@ enabled = false
 enabled = false
 
 [auth.method.oauth.google]
-enabled = false
+enabled = true
+clientId = '{{ secrets.GOOGLE_CLIENT_ID }}'
+clientSecret = '{{ secrets.GOOGLE_CLIENT_SECRET }}'
 
 [auth.method.oauth.linkedin]
 enabled = false

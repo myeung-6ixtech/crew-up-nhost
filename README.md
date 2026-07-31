@@ -119,10 +119,57 @@ Cloud: `nhost secrets create|update` per environment.
 
 | Variable | Used by |
 |---|---|
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Nhost Auth → Google OAuth provider |
 | `OCR_PROVIDER_API_KEY` | `roster-parse` (stub checks presence) |
 | `FCM_SERVER_KEY` / `APNS_KEY` | `notification-dispatch` (push stub) |
 | `NHOST_WEBHOOK_SECRET` | Event triggers + cron |
 | `NHOST_ADMIN_SECRET` | Functions → Hasura `service` role |
+
+## Google OAuth
+
+Google generates the credentials — you do **not** invent a Client ID or Client Secret. Create them in [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials** → **Create credentials** → **OAuth client ID** → type **Web application**.
+
+### Redirect URIs (required in Google)
+
+Add **both** if you use local dev and Nhost Cloud:
+
+| Environment | Authorized JavaScript origin | Authorized redirect URI |
+|---|---|---|
+| Local (`nhost up`) | `https://local.auth.local.nhost.run` | `https://local.auth.local.nhost.run/v1/signin/provider/google/callback` |
+| Cloud | `https://<subdomain>.auth.<region>.nhost.run` | `https://<subdomain>.auth.<region>.nhost.run/v1/signin/provider/google/callback` |
+
+Replace `<subdomain>` and `<region>` with your Nhost Cloud project values (e.g. `abcdefgh`, `eu-central-1`). Find the exact callback URL in the Nhost Dashboard → **Authentication** → **Google** when enabling the provider.
+
+OAuth consent screen: while in **Testing**, add your Google account under **Test users**. For production, complete Google's verification (or use a custom auth domain on Nhost).
+
+### Wire secrets into `crew-up-nhost`
+
+`nhost/nhost.toml` references:
+
+```toml
+[auth.method.oauth.google]
+enabled = true
+clientId = '{{ secrets.GOOGLE_CLIENT_ID }}'
+clientSecret = '{{ secrets.GOOGLE_CLIENT_SECRET }}'
+```
+
+**Local** — add to `.secrets` (gitignored):
+
+```bash
+GOOGLE_CLIENT_ID='123456789-xxxx.apps.googleusercontent.com'
+GOOGLE_CLIENT_SECRET='GOCSPX-xxxxxxxx'
+```
+
+Then restart: `nhost down && nhost up`
+
+**Nhost Cloud** — set the same keys in Dashboard → **Settings** → **Secrets**, or:
+
+```bash
+nhost secrets create GOOGLE_CLIENT_ID --value '123456789-xxxx.apps.googleusercontent.com'
+nhost secrets create GOOGLE_CLIENT_SECRET --value 'GOCSPX-xxxxxxxx'
+```
+
+Use separate Google OAuth clients (or separate secret values) per environment (local vs dev vs prod) if redirect URIs differ.
 
 ## Validation
 
