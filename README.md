@@ -121,8 +121,10 @@ Application roles in [`nhost/nhost.toml`](nhost/nhost.toml):
 
 Custom JWT claims (requires `auth.users` → `profile` relationship):
 
-- `x-hasura-is-verified` ← `profiles.is_verified`
-- `x-hasura-airline-id` ← `profiles.airline_id`
+- `x-hasura-is-verified` ← `profiles.is_verified` (default `false`)
+- `x-hasura-airline-id` ← `profiles.airline_id` (default sentinel UUID when unset — required by Hasura `same_airline` permissions on `events` / `presence`)
+
+After changing custom claims, redeploy project config and have clients refresh tokens (sign out/in or `refreshSession`).
 
 Assign staff roles in SQL or dashboard:
 

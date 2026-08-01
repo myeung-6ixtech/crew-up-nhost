@@ -78,7 +78,8 @@ default = 'false'
 [[auth.session.accessToken.customClaims]]
 key = 'airline-id'
 value = 'profile.airline_id'
-default = ''
+# Sentinel UUID so Hasura always receives x-hasura-airline-id (empty default omits the claim).
+default = '00000000-0000-0000-0000-000000000000'
 
 [auth.session.refreshToken]
 expiresIn = 2592000
