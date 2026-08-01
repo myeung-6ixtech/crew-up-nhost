@@ -17,25 +17,6 @@ select_permissions:
         - airline_id
         - base_airport
         - role_type
-        - show_rank
-        - preferred_language
-        - avatar_file_id
-        - is_verified
-        - created_at
-      filter:
-        _and:
-          - is_verified:
-              _eq: true
-          - user_id:
-              _neq: X-Hasura-User-Id
-  - role: user
-    permission:
-      columns:
-        - user_id
-        - display_name
-        - airline_id
-        - base_airport
-        - role_type
         - rank
         - show_rank
         - preferred_language
@@ -46,8 +27,14 @@ select_permissions:
         - created_at
         - updated_at
       filter:
-        user_id:
-          _eq: X-Hasura-User-Id
+        _or:
+          - user_id:
+              _eq: X-Hasura-User-Id
+          - _and:
+              - is_verified:
+                  _eq: true
+              - user_id:
+                  _neq: X-Hasura-User-Id
   - role: staff_admin
     permission:
       columns: '*'
