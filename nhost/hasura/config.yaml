@@ -1,0 +1,8 @@
+version: 3
+endpoint: https://local.hasura.local.nhost.run
+admin_secret: nhost-admin-secret
+metadata_directory: ../metadata
+migrations_directory: ../migrations
+actions:
+  kind: synchronous
+  handler_webhook_baseurl: https://local.functions.local.nhost.run/v1

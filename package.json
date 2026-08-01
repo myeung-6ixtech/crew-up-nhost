@@ -7,7 +7,8 @@
     "nhost:up": "nhost up",
     "nhost:down": "nhost down",
     "nhost:logs": "nhost logs",
-    "config:validate": "nhost config validate"
+    "config:validate": "nhost config validate",
+    "deploy:cloud": "bash scripts/apply-cloud-schema.sh"
   },
   "devDependencies": {
     "@nhost/cli": "^1.45.0"

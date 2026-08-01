@@ -34,6 +34,55 @@ Local endpoints (after `nhost up`):
 
 Stop: `nhost down` · Logs: `nhost logs`
 
+## Deploy to Nhost Cloud
+
+The mobile app expects tables like `airlines` and `profiles` in Hasura. A fresh cloud project starts with an **empty** GraphQL schema (`field 'airlines' not found` until you deploy).
+
+### Option A — Hasura admin secret (fastest, no Docker)
+
+1. Open [Nhost Dashboard](https://app.nhost.io) → your project (`tvxoufuvglucgbdftsns`) → **Settings** → **Hasura** → copy **Admin secret**.
+2. From this directory:
+
+```bash
+cp .env.deploy.example .env.deploy
+# Edit .env.deploy — paste HASURA_GRAPHQL_ADMIN_SECRET
+npm run deploy:cloud
+```
+
+This applies `nhost/migrations/` and `nhost/metadata/` to your cloud project.
+
+If a prior deploy failed partway (e.g. `type "role_type" already exists`), the init migration is **idempotent** — commit the latest `crew-up-nhost` and redeploy; it will skip objects that already exist and create anything missing.
+
+**Verify:** Hasura Console → API → role `user` → `airlines` (query) and `insert_profiles_one` (mutation) exist.
+
+### Option B — Git deployment
+
+Connect this repo to your Nhost project (Dashboard → Settings → Git), then:
+
+```bash
+nhost login
+nhost link
+nhost config apply --yes
+nhost deployments new HEAD \
+  --ref "$(git rev-parse HEAD)" \
+  --message "Deploy CrewUp MVP schema" \
+  --user "your-name" \
+  --follow
+```
+
+**Note:** `nhost list` must show your project subdomain. If not, log in with the Nhost account that owns the project.
+
+### Local dev alternative
+
+Run `nhost up` (requires Docker), then in `crew-up-app/.env`:
+
+```env
+EXPO_PUBLIC_NHOST_SUBDOMAIN=local
+EXPO_PUBLIC_NHOST_REGION=local
+```
+
+Restart Metro after changing `.env`.
+
 ## Project layout
 
 ```

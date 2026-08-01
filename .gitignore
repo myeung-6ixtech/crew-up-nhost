@@ -1,5 +1,6 @@
 .nhost
 .secrets
+.env.deploy
 node_modules
 .DS_Store
 functions/node_modules
