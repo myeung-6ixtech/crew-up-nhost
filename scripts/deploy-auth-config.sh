@@ -17,4 +17,4 @@ SUBDOMAIN="${NHOST_SUBDOMAIN:-tvxoufuvglucgbdftsns}"
 echo "Applying auth config to subdomain: ${SUBDOMAIN}"
 cd "${ROOT}"
 nhost config apply --subdomain "${SUBDOMAIN}" --yes
-echo "Done. Sign out and sign in on the app so JWTs include x-hasura-airline-id."
+echo "Done. Auth config applied (x-hasura-is-verified claim)."

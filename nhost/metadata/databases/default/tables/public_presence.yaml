@@ -33,7 +33,22 @@ select_permissions:
                   - user:
                       profile:
                         airline_id:
-                          _eq: X-Hasura-Airline-Id
+                          _is_null: false
+                  - _exists:
+                      _table:
+                        name: profiles
+                        schema: public
+                      _where:
+                        _and:
+                          - user_id:
+                              _eq: X-Hasura-User-Id
+                          - airline_id:
+                              _is_null: false
+                          - airline_id:
+                              _ceq:
+                                - user
+                                - profile
+                                - airline_id
 insert_permissions:
   - role: service
     permission:

@@ -21,4 +21,4 @@ echo "=== 2/2 Auth config (JWT custom claims) ==="
 bash scripts/deploy-auth-config.sh
 
 echo ""
-echo "All done. Sign out and sign in on the app to pick up x-hasura-airline-id."
+echo "All done. Deploy metadata to cloud with: npm run deploy:cloud"
