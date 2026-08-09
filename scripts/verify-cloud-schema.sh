@@ -101,12 +101,12 @@ done
 BUCKETS_PROBE="$(curl -sf "${ENDPOINT}/v1/graphql" \
   -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
   -H 'Content-Type: application/json' \
-  -d '{"query":"query { buckets(limit: 1) { id maxUploadFileSize } }"}')"
-if echo "${BUCKETS_PROBE}" | jq -e '.errors[] | select(.message | test("field .buckets. not found"))' >/dev/null 2>&1; then
-  echo "MISSING query_root.buckets for Nhost Storage"
+  -d '{"query":"query { buckets(limit: 1) { id minUploadFileSize maxUploadFileSize downloadExpiration } }"}')"
+if echo "${BUCKETS_PROBE}" | jq -e '.errors[] | select(.message | test("field .buckets. not found|field .minUploadFileSize. not found"))' >/dev/null 2>&1; then
+  echo "MISSING buckets camelCase fields for Nhost Storage"
   missing=1
 else
-  echo "OK buckets query (Nhost Storage)"
+  echo "OK buckets query (Nhost Storage camelCase fields)"
 fi
 
 if [[ "${missing}" -ne 0 ]]; then

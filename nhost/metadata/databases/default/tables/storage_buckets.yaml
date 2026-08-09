@@ -8,6 +8,21 @@ configuration:
     select: buckets
     select_by_pk: bucket
     select_aggregate: buckets_aggregate
+  column_config:
+    min_upload_file_size:
+      custom_name: minUploadFileSize
+    max_upload_file_size:
+      custom_name: maxUploadFileSize
+    download_expiration:
+      custom_name: downloadExpiration
+    cache_control:
+      custom_name: cacheControl
+    presigned_urls_enabled:
+      custom_name: presignedUrlsEnabled
+    created_at:
+      custom_name: createdAt
+    updated_at:
+      custom_name: updatedAt
 array_relationships:
   - name: files
     using:
@@ -24,4 +39,8 @@ select_permissions:
         - download_expiration
         - max_upload_file_size
         - min_upload_file_size
+        - cache_control
+        - presigned_urls_enabled
+        - created_at
+        - updated_at
       filter: {}

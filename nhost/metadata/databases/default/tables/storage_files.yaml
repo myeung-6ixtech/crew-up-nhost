@@ -14,6 +14,19 @@ configuration:
     update_by_pk: update_file
     delete: delete_files
     delete_by_pk: delete_file
+  column_config:
+    bucket_id:
+      custom_name: bucketId
+    mime_type:
+      custom_name: mimeType
+    uploaded_by_user_id:
+      custom_name: uploadedByUserId
+    is_uploaded:
+      custom_name: isUploaded
+    created_at:
+      custom_name: createdAt
+    updated_at:
+      custom_name: updatedAt
 object_relationships:
   - name: bucket
     using:
@@ -27,6 +40,9 @@ select_permissions:
         - name
         - size
         - mime_type
+        - etag
+        - is_uploaded
+        - metadata
         - created_at
         - updated_at
         - uploaded_by_user_id
@@ -46,6 +62,9 @@ insert_permissions:
         - name
         - size
         - mime_type
+        - etag
+        - is_uploaded
+        - metadata
 delete_permissions:
   - role: user
     permission:
