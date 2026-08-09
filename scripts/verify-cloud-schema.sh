@@ -109,6 +109,21 @@ else
   echo "OK buckets query (Nhost Storage camelCase fields)"
 fi
 
+MUTATION_QUERY='query { __type(name: "mutation_root") { fields { name } } }'
+MUTATION_FIELDS="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":$(printf '%s' "$MUTATION_QUERY" | jq -Rs .)}")"
+
+for field in insertFiles updateFile; do
+  if ! echo "${MUTATION_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
+    echo "MISSING on mutation_root: ${field} (required for Nhost Storage uploads)"
+    missing=1
+  else
+    echo "OK mutation_root.${field}"
+  fi
+done
+
 for field in authRoles authUserRoles; do
   if ! echo "${ROOT_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
     echo "MISSING on query_root: ${field} (required for Nhost Auth / Storage permissions UI)"
