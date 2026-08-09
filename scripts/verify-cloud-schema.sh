@@ -64,6 +64,31 @@ else
   missing=1
 fi
 
+for field in users user; do
+  if ! echo "${ROOT_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
+    echo "MISSING on query_root: ${field} (required for Nhost Auth JWT custom claims)"
+    missing=1
+  else
+    echo "OK query_root.${field}"
+  fi
+done
+
+USER_CLAIMS_QUERY='query UserClaimsProbe($id: uuid!) { user(id: $id) { profile { airline_id is_verified } } }'
+# Probe shape only — id may not exist; validation-failed on nested fields is the signal we care about.
+USER_PROBE="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":$(printf '%s' "$USER_CLAIMS_QUERY" | jq -Rs .),\"variables\":{\"id\":\"00000000-0000-0000-0000-000000000001\"}}")"
+if echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .user. not found|field .profile. not found"))' >/dev/null 2>&1; then
+  echo "MISSING auth.users GraphQL shape for JWT claims (user.profile)"
+  missing=1
+elif echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .user. not found"))' >/dev/null 2>&1; then
+  echo "MISSING query_root.user for JWT custom claims"
+  missing=1
+else
+  echo "OK user(id).profile (JWT custom claims query shape)"
+fi
+
 if [[ "${missing}" -ne 0 ]]; then
   echo ""
   echo "Schema is incomplete. Run: npm run deploy:cloud"

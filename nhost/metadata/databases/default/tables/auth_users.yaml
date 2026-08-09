@@ -1,6 +1,13 @@
 table:
   name: users
   schema: auth
+# Nhost Auth resolves JWT custom claims via GraphQL `user(id:)` / `users` — not `auth_users`.
+configuration:
+  custom_name: users
+  custom_root_fields:
+    select: users
+    select_by_pk: user
+    select_aggregate: users_aggregate
 object_relationships:
   - name: profile
     using:

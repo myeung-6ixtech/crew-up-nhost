@@ -124,6 +124,10 @@ Custom JWT claims (requires `auth.users` → `profile` relationship):
 - `x-hasura-is-verified` ← `profiles.is_verified` (default `false`)
 - `x-hasura-airline-id` ← `profiles.airline_id` (sentinel UUID when unset; used by `same_airline` row permissions on `presence` / `events`)
 
+Nhost Auth resolves claims by querying `user(id: { profile { … } })` on the GraphQL API. Because `auth.users` lives in the `auth` schema, Hasura would otherwise expose it as `auth_users`. [`auth_users.yaml`](nhost/metadata/databases/default/tables/auth_users.yaml) sets `custom_root_fields` so the API exposes `users` / `user` as Auth expects. `npm run verify:schema` checks this.
+
+**Config deploy:** `nhost config apply` replaces the entire cloud config. Run `nhost config pull` first if cloud has drifted, then merge CrewUp settings before `npm run deploy:auth`.
+
 ### Optional airline + `same_airline` (Option A)
 
 Airline affiliation is **optional** (`profiles.airline_id` nullable). The JWT claim does not require every user to pick an airline:

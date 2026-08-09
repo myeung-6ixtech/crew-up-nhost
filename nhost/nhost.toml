@@ -40,7 +40,6 @@ mode = 'disabled'
 
 [auth.redirections]
 clientUrl = 'http://localhost:3000'
-# Mobile deep links after OAuth (Expo scheme: crewup)
 allowedUrls = ['crewup://', 'exp://']
 
 [auth.signUp]
@@ -78,7 +77,6 @@ default = 'false'
 [[auth.session.accessToken.customClaims]]
 key = 'airline-id'
 value = 'profile.airline_id'
-# Sentinel when unset — must match AIRLINE_CLAIM_SENTINEL in functions/_lib/airlineClaim.ts
 default = '00000000-0000-0000-0000-000000000000'
 
 [auth.session.refreshToken]
