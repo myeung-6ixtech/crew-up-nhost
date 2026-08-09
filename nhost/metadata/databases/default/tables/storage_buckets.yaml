@@ -1,6 +1,13 @@
 table:
   name: buckets
   schema: storage
+# Nhost Storage queries `buckets` on query_root — not `storage_buckets`.
+configuration:
+  custom_name: buckets
+  custom_root_fields:
+    select: buckets
+    select_by_pk: bucket
+    select_aggregate: buckets_aggregate
 array_relationships:
   - name: files
     using:

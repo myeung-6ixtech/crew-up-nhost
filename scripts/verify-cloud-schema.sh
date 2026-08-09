@@ -89,6 +89,26 @@ else
   echo "OK user(id).profile (JWT custom claims query shape)"
 fi
 
+for field in buckets files; do
+  if ! echo "${ROOT_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
+    echo "MISSING on query_root: ${field} (required for Nhost Storage)"
+    missing=1
+  else
+    echo "OK query_root.${field}"
+  fi
+done
+
+BUCKETS_PROBE="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { buckets(limit: 1) { id maxUploadFileSize } }"}')"
+if echo "${BUCKETS_PROBE}" | jq -e '.errors[] | select(.message | test("field .buckets. not found"))' >/dev/null 2>&1; then
+  echo "MISSING query_root.buckets for Nhost Storage"
+  missing=1
+else
+  echo "OK buckets query (Nhost Storage)"
+fi
+
 if [[ "${missing}" -ne 0 ]]; then
   echo ""
   echo "Schema is incomplete. Run: npm run deploy:cloud"

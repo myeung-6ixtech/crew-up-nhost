@@ -1,6 +1,19 @@
 table:
   name: files
   schema: storage
+# Nhost Storage queries/mutates `files` on query_root — not `storage_files`.
+configuration:
+  custom_name: files
+  custom_root_fields:
+    select: files
+    select_by_pk: file
+    select_aggregate: files_aggregate
+    insert: insert_files
+    insert_one: insert_file
+    update: update_files
+    update_by_pk: update_file
+    delete: delete_files
+    delete_by_pk: delete_file
 object_relationships:
   - name: bucket
     using:
