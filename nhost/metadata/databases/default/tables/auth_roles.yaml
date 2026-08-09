@@ -1,6 +1,15 @@
 table:
   name: roles
   schema: auth
+# Nhost Auth / Dashboard expect authRoles — not auth_roles.
+configuration:
+  custom_name: authRoles
+  custom_root_fields:
+    select: authRoles
+    select_by_pk: authRole
+    select_aggregate: authRolesAggregate
+    insert: insertAuthRoles
+    insert_one: insertAuthRole
 select_permissions:
   - role: user
     permission:

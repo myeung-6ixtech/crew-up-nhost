@@ -109,6 +109,26 @@ else
   echo "OK buckets query (Nhost Storage camelCase fields)"
 fi
 
+for field in authRoles authUserRoles; do
+  if ! echo "${ROOT_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
+    echo "MISSING on query_root: ${field} (required for Nhost Auth / Storage permissions UI)"
+    missing=1
+  else
+    echo "OK query_root.${field}"
+  fi
+done
+
+AUTH_ROLES_PROBE="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"query { authRoles { role } }"}')"
+if echo "${AUTH_ROLES_PROBE}" | jq -e '.errors[] | select(.message | test("field .authRoles. not found"))' >/dev/null 2>&1; then
+  echo "MISSING authRoles query for Nhost dashboard"
+  missing=1
+else
+  echo "OK authRoles query (Nhost Auth / Storage permissions)"
+fi
+
 if [[ "${missing}" -ne 0 ]]; then
   echo ""
   echo "Schema is incomplete. Run: npm run deploy:cloud"

@@ -126,7 +126,9 @@ Custom JWT claims (requires `auth.users` → `profile` relationship):
 
 Nhost Auth resolves claims by querying `user(id: { profile { … } })` on the GraphQL API. Because `auth.users` lives in the `auth` schema, Hasura would otherwise expose it as `auth_users`. [`auth_users.yaml`](nhost/metadata/databases/default/tables/auth_users.yaml) sets `custom_root_fields` so the API exposes `users` / `user` as Auth expects.
 
-Nhost Storage expects `buckets` and `files` root fields (not `storage_buckets` / `storage_files`). See [`storage_buckets.yaml`](nhost/metadata/databases/default/tables/storage_buckets.yaml) and [`storage_files.yaml`](nhost/metadata/databases/default/tables/storage_files.yaml). `npm run verify:schema` checks Auth and Storage GraphQL shapes.
+Nhost Storage expects `buckets` and `files` root fields (not `storage_buckets` / `storage_files`). See [`storage_buckets.yaml`](nhost/metadata/databases/default/tables/storage_buckets.yaml) and [`storage_files.yaml`](nhost/metadata/databases/default/tables/storage_files.yaml).
+
+Nhost Auth / Dashboard expect `authRoles` and `authUserRoles` (not `auth_roles` / `auth_user_roles`). See [`auth_roles.yaml`](nhost/metadata/databases/default/tables/auth_roles.yaml) and [`auth_user_roles.yaml`](nhost/metadata/databases/default/tables/auth_user_roles.yaml). `npm run verify:schema` checks Auth, Storage, and role GraphQL shapes.
 
 **Config deploy:** `nhost config apply` replaces the entire cloud config. Run `nhost config pull` first if cloud has drifted, then merge CrewUp settings before `npm run deploy:auth`.
 
