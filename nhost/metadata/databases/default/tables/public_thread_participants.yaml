@@ -13,8 +13,10 @@ select_permissions:
     permission:
       columns: '*'
       filter:
-        user_id:
-          _eq: X-Hasura-User-Id
+        thread:
+          participants:
+            user_id:
+              _eq: X-Hasura-User-Id
 insert_permissions:
   - role: user
     permission:
@@ -25,6 +27,7 @@ insert_permissions:
         user_id: X-Hasura-User-Id
       columns:
         - thread_id
+        - user_id
 update_permissions:
   - role: user
     permission:

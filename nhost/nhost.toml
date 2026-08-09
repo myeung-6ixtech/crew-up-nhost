@@ -75,6 +75,12 @@ key = 'is-verified'
 value = 'profile.is_verified'
 default = 'false'
 
+[[auth.session.accessToken.customClaims]]
+key = 'airline-id'
+value = 'profile.airline_id'
+# Sentinel when unset — must match AIRLINE_CLAIM_SENTINEL in functions/_lib/airlineClaim.ts
+default = '00000000-0000-0000-0000-000000000000'
+
 [auth.session.refreshToken]
 expiresIn = 2592000
 

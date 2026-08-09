@@ -7,10 +7,12 @@ import {
   type RosterRow,
 } from './_lib/auth.js';
 import { graphqlRaw } from './_lib/graphql.js';
+import { normalizeVisibilityForAffiliation } from './_lib/airlineClaim.js';
 
 interface ProfileRow {
   profiles_by_pk: {
     default_visibility: string;
+    airline_id: string | null;
   } | null;
 }
 
@@ -29,13 +31,18 @@ async function recomputePresenceForUser(userId: string) {
       query Profile($userId: uuid!) {
         profiles_by_pk(user_id: $userId) {
           default_visibility
+          airline_id
         }
       }
     `,
     { userId },
   );
 
-  const visibility = profileData.profiles_by_pk?.default_visibility ?? 'friends';
+  const profile = profileData.profiles_by_pk;
+  const visibility = normalizeVisibilityForAffiliation(
+    profile?.default_visibility ?? 'friends',
+    profile?.airline_id,
+  );
 
   if (visibility === 'off') {
     await graphqlRaw(

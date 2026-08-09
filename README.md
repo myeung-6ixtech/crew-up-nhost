@@ -122,10 +122,22 @@ Application roles in [`nhost/nhost.toml`](nhost/nhost.toml):
 Custom JWT claims (requires `auth.users` → `profile` relationship):
 
 - `x-hasura-is-verified` ← `profiles.is_verified` (default `false`)
+- `x-hasura-airline-id` ← `profiles.airline_id` (sentinel UUID when unset; used by `same_airline` row permissions on `presence` / `events`)
 
-`same_airline` visibility on `presence` / `events` is enforced in Hasura row permissions by comparing the viewer's and target's `profiles.airline_id` in the database — no `x-hasura-airline-id` JWT claim. Airline affiliation is optional (`profiles.airline_id` nullable).
+### Optional airline + `same_airline` (Option A)
 
-After changing custom claims, redeploy project config and have clients refresh tokens (sign out/in or `refreshSession`).
+Airline affiliation is **optional** (`profiles.airline_id` nullable). The JWT claim does not require every user to pick an airline:
+
+| Layer | Behavior |
+|---|---|
+| **JWT** | Unset `airline_id` → sentinel `00000000-0000-0000-0000-000000000000` (see `lib/airlineClaim.ts` / `functions/_lib/airlineClaim.ts`) |
+| **Hasura read** | `same_airline` rows only match when viewer claim equals target/creator `airline_id` and target has a non-null airline |
+| **Hasura write** | `events` insert/update rejects `visibility_scope: same_airline` unless creator has `profiles.airline_id` |
+| **presence-compute** | Downgrades `same_airline` → `friends` when user has no airline |
+| **App UI** | Hides `same_airline` visibility when no airline; normalizes on profile save |
+| **Session refresh** | Call `refreshSessionClaims()` (or sign out/in) after changing `airline_id` so the JWT claim updates |
+
+After changing custom claims, redeploy project config (`npm run deploy:auth`) and have clients refresh tokens.
 
 Assign staff roles in SQL or dashboard:
 

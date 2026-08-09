@@ -11,12 +11,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-if [[ -f "${ROOT}/.env.deploy" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "${ROOT}/.env.deploy"
-  set +a
-fi
+# shellcheck disable=SC1091
+source "${ROOT}/scripts/load-deploy-env.sh"
+load_deploy_env "${ROOT}/.env.deploy"
 
 SUBDOMAIN="${NHOST_SUBDOMAIN:?Set NHOST_SUBDOMAIN in .env.deploy}"
 REGION="${NHOST_REGION:-ap-southeast-1}"
@@ -36,4 +33,17 @@ npx --yes "hasura-cli@${HASURA_VERSION}" metadata apply \
   --endpoint "${ENDPOINT}" \
   --admin-secret "${ADMIN_SECRET}"
 
-echo "Done. Verify in Hasura Console that role 'user' can query airlines."
+echo "Reloading metadata ..."
+npx --yes "hasura-cli@${HASURA_VERSION}" metadata reload \
+  --endpoint "${ENDPOINT}" \
+  --admin-secret "${ADMIN_SECRET}"
+
+echo "Checking metadata consistency ..."
+if ! npx --yes "hasura-cli@${HASURA_VERSION}" metadata inconsistency status \
+  --endpoint "${ENDPOINT}" \
+  --admin-secret "${ADMIN_SECRET}"; then
+  echo "Metadata inconsistencies found. Run: hasura metadata inconsistency list"
+  exit 1
+fi
+
+echo "Done. Run npm run verify:schema to confirm events and threads.event are exposed."

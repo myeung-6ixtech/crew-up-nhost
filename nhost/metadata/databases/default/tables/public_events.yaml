@@ -36,30 +36,40 @@ select_permissions:
               - creator:
                   profile:
                     airline_id:
+                      _eq: X-Hasura-Airline-Id
+              - creator:
+                  profile:
+                    airline_id:
                       _is_null: false
+          - creator_id:
+              _eq: X-Hasura-User-Id
+          - attendees:
+              user_id:
+                _eq: X-Hasura-User-Id
+          - thread:
+              participants:
+                user_id:
+                  _eq: X-Hasura-User-Id
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        _and:
+          - creator_id:
+              _eq: X-Hasura-User-Id
+          - _or:
+              - visibility_scope:
+                  _neq: same_airline
               - _exists:
                   _table:
-                    name: profiles
                     schema: public
+                    name: profiles
                   _where:
                     _and:
                       - user_id:
                           _eq: X-Hasura-User-Id
                       - airline_id:
                           _is_null: false
-                      - airline_id:
-                          _ceq:
-                            - creator
-                            - profile
-                            - airline_id
-          - creator_id:
-              _eq: X-Hasura-User-Id
-insert_permissions:
-  - role: user
-    permission:
-      check:
-        creator_id:
-          _eq: X-Hasura-User-Id
       set:
         creator_id: X-Hasura-User-Id
       columns:
@@ -93,8 +103,22 @@ update_permissions:
         creator_id:
           _eq: X-Hasura-User-Id
       check:
-        creator_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - creator_id:
+              _eq: X-Hasura-User-Id
+          - _or:
+              - visibility_scope:
+                  _neq: same_airline
+              - _exists:
+                  _table:
+                    schema: public
+                    name: profiles
+                  _where:
+                    _and:
+                      - user_id:
+                          _eq: X-Hasura-User-Id
+                      - airline_id:
+                          _is_null: false
 delete_permissions:
   - role: user
     permission:

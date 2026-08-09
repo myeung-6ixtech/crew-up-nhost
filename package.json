@@ -10,7 +10,8 @@
     "config:validate": "nhost config validate",
     "deploy:cloud": "bash scripts/apply-cloud-schema.sh",
     "deploy:auth": "bash scripts/deploy-auth-config.sh",
-    "deploy:all": "bash scripts/deploy-all.sh"
+    "deploy:all": "bash scripts/deploy-all.sh",
+    "verify:schema": "bash scripts/verify-cloud-schema.sh"
   },
   "devDependencies": {
     "@nhost/cli": "^1.45.0"
