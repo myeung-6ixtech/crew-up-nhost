@@ -1,13 +1,60 @@
 table:
   name: users
   schema: auth
-# Nhost Auth resolves JWT custom claims via GraphQL `user(id:)` / `users` — not `auth_users`.
+# Nhost Auth resolves JWT custom claims and user lookups via GraphQL `user(id:)` /
+# `users` — not `auth_users`. Auth also expects camelCase column names (displayName,
+# avatarUrl, …) matching its OpenAPI / SDK, same pattern as storage_buckets.yaml.
 configuration:
   custom_name: users
   custom_root_fields:
     select: users
     select_by_pk: user
     select_aggregate: users_aggregate
+    insert: insertUsers
+    insert_one: insertUser
+    update: updateUsers
+    update_by_pk: updateUser
+    delete: deleteUsers
+    delete_by_pk: deleteUser
+  column_config:
+    created_at:
+      custom_name: createdAt
+    updated_at:
+      custom_name: updatedAt
+    last_seen:
+      custom_name: lastSeen
+    display_name:
+      custom_name: displayName
+    avatar_url:
+      custom_name: avatarUrl
+    phone_number:
+      custom_name: phoneNumber
+    password_hash:
+      custom_name: passwordHash
+    email_verified:
+      custom_name: emailVerified
+    phone_number_verified:
+      custom_name: phoneNumberVerified
+    new_email:
+      custom_name: newEmail
+    otp_method_last_used:
+      custom_name: otpMethodLastUsed
+    otp_hash:
+      custom_name: otpHash
+    otp_hash_expires_at:
+      custom_name: otpHashExpiresAt
+    default_role:
+      custom_name: defaultRole
+    is_anonymous:
+      custom_name: isAnonymous
+    totp_secret:
+      custom_name: totpSecret
+    active_mfa_type:
+      custom_name: activeMfaType
+    ticket_expires_at:
+      custom_name: ticketExpiresAt
+    webauthn_current_challenge:
+      custom_name: webauthnCurrentChallenge
 object_relationships:
   - name: profile
     using:

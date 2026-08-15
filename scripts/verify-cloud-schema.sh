@@ -73,14 +73,14 @@ for field in users user; do
   fi
 done
 
-USER_CLAIMS_QUERY='query UserClaimsProbe($id: uuid!) { user(id: $id) { profile { airline_id is_verified } } }'
+USER_CLAIMS_QUERY='query UserClaimsProbe($id: uuid!) { user(id: $id) { profile { airline_id is_verified } displayName } }'
 # Probe shape only — id may not exist; validation-failed on nested fields is the signal we care about.
 USER_PROBE="$(curl -sf "${ENDPOINT}/v1/graphql" \
   -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
   -H 'Content-Type: application/json' \
   -d "{\"query\":$(printf '%s' "$USER_CLAIMS_QUERY" | jq -Rs .),\"variables\":{\"id\":\"00000000-0000-0000-0000-000000000001\"}}")"
-if echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .user. not found|field .profile. not found"))' >/dev/null 2>&1; then
-  echo "MISSING auth.users GraphQL shape for JWT claims (user.profile)"
+if echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .displayName. not found|field .user. not found|field .profile. not found"))' >/dev/null 2>&1; then
+  echo "MISSING auth.users GraphQL shape for Nhost Auth (user.displayName / user.profile)"
   missing=1
 elif echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .user. not found"))' >/dev/null 2>&1; then
   echo "MISSING query_root.user for JWT custom claims"
@@ -142,6 +142,18 @@ if echo "${AUTH_ROLES_PROBE}" | jq -e '.errors[] | select(.message | test("field
   missing=1
 else
   echo "OK authRoles query (Nhost Auth / Storage permissions)"
+fi
+
+USERS_BOOL_EXP_QUERY='query { __type(name: "users_bool_exp") { inputFields { name } } }'
+USERS_BOOL_EXP="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":$(printf '%s' "$USERS_BOOL_EXP_QUERY" | jq -Rs .)}")"
+if ! echo "${USERS_BOOL_EXP}" | jq -e '.data.__type.inputFields[] | select(.name == "displayName")' >/dev/null; then
+  echo "MISSING users_bool_exp.displayName (Nhost Auth user filters require camelCase column_config on auth.users)"
+  missing=1
+else
+  echo "OK users_bool_exp.displayName (Nhost Auth camelCase columns)"
 fi
 
 if [[ "${missing}" -ne 0 ]]; then

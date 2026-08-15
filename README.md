@@ -128,7 +128,9 @@ Nhost Auth resolves claims by querying `user(id: { profile { … } })` on the Gr
 
 Nhost Storage expects `buckets` and `files` root fields (not `storage_buckets` / `storage_files`). See [`storage_buckets.yaml`](nhost/metadata/databases/default/tables/storage_buckets.yaml) and [`storage_files.yaml`](nhost/metadata/databases/default/tables/storage_files.yaml).
 
-Nhost Auth / Dashboard expect `authRoles` and `authUserRoles` (not `auth_roles` / `auth_user_roles`). See [`auth_roles.yaml`](nhost/metadata/databases/default/tables/auth_roles.yaml) and [`auth_user_roles.yaml`](nhost/metadata/databases/default/tables/auth_user_roles.yaml). `npm run verify:schema` checks Auth, Storage, and role GraphQL shapes.
+Nhost Auth / Dashboard expect `authRoles` and `authUserRoles` (not `auth_roles` / `auth_user_roles`). See [`auth_roles.yaml`](nhost/metadata/databases/default/tables/auth_roles.yaml) and [`auth_user_roles.yaml`](nhost/metadata/databases/default/tables/auth_user_roles.yaml).
+
+[`auth_users.yaml`](nhost/metadata/databases/default/tables/auth_users.yaml) must also map `auth.users` columns to **camelCase** GraphQL names (`displayName`, `avatarUrl`, …). Without `column_config`, Nhost Auth fails with `field 'displayName' not found in type: 'users_bool_exp'`. `npm run verify:schema` checks `users_bool_exp.displayName`.
 
 **Config deploy:** `nhost config apply` replaces the entire cloud config. Run `nhost config pull` first if cloud has drifted, then merge CrewUp settings before `npm run deploy:auth`.
 
