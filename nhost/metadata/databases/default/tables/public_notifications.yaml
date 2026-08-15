@@ -13,6 +13,11 @@ select_permissions:
         user_id:
           _eq: X-Hasura-User-Id
       allow_aggregates: true
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
 update_permissions:
   - role: user
     permission:

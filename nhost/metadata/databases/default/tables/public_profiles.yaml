@@ -39,6 +39,7 @@ select_permissions:
     permission:
       columns: '*'
       filter: {}
+      allow_aggregations: true
   - role: moderator
     permission:
       columns:

@@ -40,7 +40,7 @@ mode = 'disabled'
 
 [auth.redirections]
 clientUrl = 'http://localhost:3000'
-allowedUrls = ['crewup://', 'exp://']
+allowedUrls = ['crewup://', 'exp://', 'http://localhost:3000', 'https://admin.crewup.app']
 
 [auth.signUp]
 enabled = true

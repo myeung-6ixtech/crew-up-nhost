@@ -107,3 +107,23 @@ select_permissions:
         - disabled
         - default_role
       filter: {}
+  - role: staff_admin
+    permission:
+      columns:
+        - id
+        - email
+        - display_name
+        - disabled
+        - email_verified
+        - created_at
+        - last_seen
+        - default_role
+      filter: {}
+      allow_aggregations: true
+update_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - disabled
+      filter: {}
+      check: {}

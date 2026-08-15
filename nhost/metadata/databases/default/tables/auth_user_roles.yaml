@@ -36,3 +36,18 @@ select_permissions:
       filter:
         user_id:
           _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+insert_permissions:
+  - role: staff_admin
+    permission:
+      check: {}
+      columns:
+        - user_id
+        - role
+delete_permissions:
+  - role: staff_admin
+    permission:
+      filter: {}

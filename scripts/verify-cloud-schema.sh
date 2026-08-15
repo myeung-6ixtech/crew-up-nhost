@@ -174,5 +174,33 @@ if [[ "${missing}" -ne 0 ]]; then
   exit 1
 fi
 
+# Admin portal: staff_admin aggregate permissions (shape check via admin introspection)
+ADMIN_AGG_QUERY='query { events_aggregate { aggregate { count } } profiles_aggregate { aggregate { count } } usersAggregate { aggregate { count } } }'
+ADMIN_AGG="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":$(printf '%s' "$ADMIN_AGG_QUERY" | jq -Rs .)}")"
+if echo "${ADMIN_AGG}" | jq -e '.errors[] | select(.message | test("field .events_aggregate. not found|field .profiles_aggregate. not found|field .usersAggregate. not found"))' >/dev/null 2>&1; then
+  echo "MISSING aggregate root fields for admin dashboard (staff_admin permissions)"
+  missing=1
+else
+  echo "OK aggregate root fields (events_aggregate, profiles_aggregate, usersAggregate)"
+fi
+
+for field in users usersAggregate authUserRoles authRoles; do
+  if ! echo "${ROOT_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
+    echo "MISSING on query_root: ${field} (required for admin user/role management)"
+    missing=1
+  else
+    echo "OK query_root.${field}"
+  fi
+done
+
+if [[ "${missing}" -ne 0 ]]; then
+  echo ""
+  echo "Schema is incomplete. Run: npm run deploy:cloud"
+  exit 1
+fi
+
 echo ""
 echo "Schema check passed."

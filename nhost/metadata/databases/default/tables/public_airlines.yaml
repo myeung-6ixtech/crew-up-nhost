@@ -31,3 +31,26 @@ select_permissions:
       filter:
         is_active:
           _eq: true
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+insert_permissions:
+  - role: staff_admin
+    permission:
+      check: {}
+      columns:
+        - code
+        - name
+        - email_domains
+        - is_active
+update_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - code
+        - name
+        - email_domains
+        - is_active
+      filter: {}
+      check: {}

@@ -19,6 +19,7 @@ select_permissions:
     permission:
       columns: '*'
       filter: {}
+      allow_aggregations: true
 insert_permissions:
   - role: user
     permission:

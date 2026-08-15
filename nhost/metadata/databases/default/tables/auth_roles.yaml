@@ -34,3 +34,7 @@ select_permissions:
       columns:
         - role
       filter: {}
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}

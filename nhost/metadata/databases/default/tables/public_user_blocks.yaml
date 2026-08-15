@@ -15,6 +15,11 @@ select_permissions:
       filter:
         blocker_id:
           _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
 insert_permissions:
   - role: user
     permission:
