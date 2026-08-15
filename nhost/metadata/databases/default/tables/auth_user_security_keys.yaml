@@ -1,0 +1,26 @@
+table:
+  name: user_security_keys
+  schema: auth
+configuration:
+  custom_name: authUserSecurityKeys
+  custom_root_fields:
+    select: authUserSecurityKeys
+    select_by_pk: authUserSecurityKey
+    select_aggregate: authUserSecurityKeysAggregate
+    insert: insertAuthUserSecurityKeys
+    insert_one: insertAuthUserSecurityKey
+    update: updateAuthUserSecurityKeys
+    update_by_pk: updateAuthUserSecurityKey
+    delete: deleteAuthUserSecurityKeys
+    delete_by_pk: deleteAuthUserSecurityKey
+  column_config:
+    credential_id:
+      custom_name: credentialId
+    credential_public_key:
+      custom_name: credentialPublicKey
+    user_id:
+      custom_name: userId
+object_relationships:
+  - name: user
+    using:
+      foreign_key_constraint_on: user_id

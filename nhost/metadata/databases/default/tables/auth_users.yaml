@@ -1,15 +1,14 @@
 table:
   name: users
   schema: auth
-# Nhost Auth resolves JWT custom claims and user lookups via GraphQL `user(id:)` /
-# `users` — not `auth_users`. Auth also expects camelCase column names (displayName,
-# avatarUrl, …) matching its OpenAPI / SDK, same pattern as storage_buckets.yaml.
+# Standard Nhost Auth GraphQL shape (users / user / displayName / userProviders, …).
+# CrewUp adds the public.profiles relationship for JWT custom claims.
 configuration:
   custom_name: users
   custom_root_fields:
     select: users
     select_by_pk: user
-    select_aggregate: users_aggregate
+    select_aggregate: usersAggregate
     insert: insertUsers
     insert_one: insertUser
     update: updateUsers
@@ -17,45 +16,48 @@ configuration:
     delete: deleteUsers
     delete_by_pk: deleteUser
   column_config:
-    created_at:
-      custom_name: createdAt
-    updated_at:
-      custom_name: updatedAt
-    last_seen:
-      custom_name: lastSeen
-    display_name:
-      custom_name: displayName
+    active_mfa_type:
+      custom_name: activeMfaType
     avatar_url:
       custom_name: avatarUrl
-    phone_number:
-      custom_name: phoneNumber
-    password_hash:
-      custom_name: passwordHash
+    created_at:
+      custom_name: createdAt
+    default_role:
+      custom_name: defaultRole
+    display_name:
+      custom_name: displayName
     email_verified:
       custom_name: emailVerified
-    phone_number_verified:
-      custom_name: phoneNumberVerified
+    is_anonymous:
+      custom_name: isAnonymous
+    last_seen:
+      custom_name: lastSeen
     new_email:
       custom_name: newEmail
-    otp_method_last_used:
-      custom_name: otpMethodLastUsed
     otp_hash:
       custom_name: otpHash
     otp_hash_expires_at:
       custom_name: otpHashExpiresAt
-    default_role:
-      custom_name: defaultRole
-    is_anonymous:
-      custom_name: isAnonymous
-    totp_secret:
-      custom_name: totpSecret
-    active_mfa_type:
-      custom_name: activeMfaType
+    otp_method_last_used:
+      custom_name: otpMethodLastUsed
+    password_hash:
+      custom_name: passwordHash
+    phone_number:
+      custom_name: phoneNumber
+    phone_number_verified:
+      custom_name: phoneNumberVerified
     ticket_expires_at:
       custom_name: ticketExpiresAt
+    totp_secret:
+      custom_name: totpSecret
+    updated_at:
+      custom_name: updatedAt
     webauthn_current_challenge:
-      custom_name: webauthnCurrentChallenge
+      custom_name: currentChallenge
 object_relationships:
+  - name: defaultRoleByRole
+    using:
+      foreign_key_constraint_on: default_role
   - name: profile
     using:
       manual_configuration:
@@ -66,12 +68,33 @@ object_relationships:
           name: profiles
           schema: public
 array_relationships:
+  - name: refreshTokens
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: refresh_tokens
+          schema: auth
   - name: roles
     using:
       foreign_key_constraint_on:
         column: user_id
         table:
           name: user_roles
+          schema: auth
+  - name: securityKeys
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: user_security_keys
+          schema: auth
+  - name: userProviders
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: user_providers
           schema: auth
 select_permissions:
   - role: user

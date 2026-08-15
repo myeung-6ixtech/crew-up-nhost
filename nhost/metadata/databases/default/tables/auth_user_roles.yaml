@@ -1,7 +1,6 @@
 table:
   name: user_roles
   schema: auth
-# Nhost Auth expects authUserRoles — not auth_user_roles.
 configuration:
   custom_name: authUserRoles
   custom_root_fields:
@@ -10,11 +9,15 @@ configuration:
     select_aggregate: authUserRolesAggregate
     insert: insertAuthUserRoles
     insert_one: insertAuthUserRole
+    update: updateAuthUserRoles
+    update_by_pk: updateAuthUserRole
+    delete: deleteAuthUserRoles
+    delete_by_pk: deleteAuthUserRole
   column_config:
-    user_id:
-      custom_name: userId
     created_at:
       custom_name: createdAt
+    user_id:
+      custom_name: userId
 object_relationships:
   - name: roleByRole
     using:

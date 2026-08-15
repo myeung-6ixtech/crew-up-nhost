@@ -1,7 +1,6 @@
 table:
   name: roles
   schema: auth
-# Nhost Auth / Dashboard expect authRoles — not auth_roles.
 configuration:
   custom_name: authRoles
   custom_root_fields:
@@ -10,6 +9,25 @@ configuration:
     select_aggregate: authRolesAggregate
     insert: insertAuthRoles
     insert_one: insertAuthRole
+    update: updateAuthRoles
+    update_by_pk: updateAuthRole
+    delete: deleteAuthRoles
+    delete_by_pk: deleteAuthRole
+array_relationships:
+  - name: userRoles
+    using:
+      foreign_key_constraint_on:
+        column: role
+        table:
+          name: user_roles
+          schema: auth
+  - name: usersByDefaultRole
+    using:
+      foreign_key_constraint_on:
+        column: default_role
+        table:
+          name: users
+          schema: auth
 select_permissions:
   - role: user
     permission:

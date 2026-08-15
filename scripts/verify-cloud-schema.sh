@@ -73,14 +73,14 @@ for field in users user; do
   fi
 done
 
-USER_CLAIMS_QUERY='query UserClaimsProbe($id: uuid!) { user(id: $id) { profile { airline_id is_verified } displayName } }'
+USER_CLAIMS_QUERY='query UserClaimsProbe($id: uuid!) { user(id: $id) { profile { airline_id is_verified } displayName userProviders { id providerId } } }'
 # Probe shape only — id may not exist; validation-failed on nested fields is the signal we care about.
 USER_PROBE="$(curl -sf "${ENDPOINT}/v1/graphql" \
   -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
   -H 'Content-Type: application/json' \
   -d "{\"query\":$(printf '%s' "$USER_CLAIMS_QUERY" | jq -Rs .),\"variables\":{\"id\":\"00000000-0000-0000-0000-000000000001\"}}")"
-if echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .displayName. not found|field .user. not found|field .profile. not found"))' >/dev/null 2>&1; then
-  echo "MISSING auth.users GraphQL shape for Nhost Auth (user.displayName / user.profile)"
+if echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .displayName. not found|field .userProviders. not found|field .user. not found|field .profile. not found"))' >/dev/null 2>&1; then
+  echo "MISSING auth.users GraphQL shape for Nhost Auth (user.displayName / user.userProviders / user.profile)"
   missing=1
 elif echo "${USER_PROBE}" | jq -e '.errors[] | select(.message | test("field .user. not found"))' >/dev/null 2>&1; then
   echo "MISSING query_root.user for JWT custom claims"
@@ -124,7 +124,7 @@ for field in insertFiles updateFile; do
   fi
 done
 
-for field in authRoles authUserRoles; do
+for field in authRoles authUserRoles authUserProviders authProviders; do
   if ! echo "${ROOT_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
     echo "MISSING on query_root: ${field} (required for Nhost Auth / Storage permissions UI)"
     missing=1
@@ -154,6 +154,18 @@ if ! echo "${USERS_BOOL_EXP}" | jq -e '.data.__type.inputFields[] | select(.name
   missing=1
 else
   echo "OK users_bool_exp.displayName (Nhost Auth camelCase columns)"
+fi
+
+USERS_TYPE_QUERY='query { __type(name: "users") { fields { name } } }'
+USERS_TYPE="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":$(printf '%s' "$USERS_TYPE_QUERY" | jq -Rs .)}")"
+if ! echo "${USERS_TYPE}" | jq -e '.data.__type.fields[] | select(.name == "userProviders")' >/dev/null; then
+  echo "MISSING users.userProviders relationship (track auth.user_providers + auth_user_providers.yaml)"
+  missing=1
+else
+  echo "OK users.userProviders (Nhost Auth users list / OAuth linking)"
 fi
 
 if [[ "${missing}" -ne 0 ]]; then

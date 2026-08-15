@@ -1,0 +1,15 @@
+table:
+  name: provider_requests
+  schema: auth
+configuration:
+  custom_name: authProviderRequests
+  custom_root_fields:
+    select: authProviderRequests
+    select_by_pk: authProviderRequest
+    select_aggregate: authProviderRequestsAggregate
+    insert: insertAuthProviderRequests
+    insert_one: insertAuthProviderRequest
+    update: updateAuthProviderRequests
+    update_by_pk: updateAuthProviderRequest
+    delete: deleteAuthProviderRequests
+    delete_by_pk: deleteAuthProviderRequest
