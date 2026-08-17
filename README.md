@@ -116,8 +116,12 @@ Includes tables from `documentation/sql/001`–`008` and `010`, plus:
 
 Application roles in [`nhost/nhost.toml`](nhost/nhost.toml):
 
-- `user` (default)
-- `moderator`, `staff_admin` (assign via `auth.user_roles`)
+- `user` (default) and `me` — only roles in `[auth.user.roles].allowed` (Nhost auto-grants every role listed there to **all** users)
+- `moderator`, `staff_admin` — **do not** add to `allowed`; grant per user via `auth.user_roles` only
+
+```sql
+INSERT INTO auth.user_roles (user_id, role) VALUES ('<uuid>', 'staff_admin');
+```
 
 Custom JWT claims (requires `auth.users` → `profile` relationship):
 

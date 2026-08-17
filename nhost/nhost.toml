@@ -50,7 +50,9 @@ disableAutoSignup = false
 [auth.user]
 [auth.user.roles]
 default = 'user'
-allowed = ['user', 'me', 'moderator', 'staff_admin']
+# Only client roles here — Nhost auto-grants every role in `allowed` to all users.
+# Grant moderator / staff_admin per-user via auth.user_roles (admin portal or SQL).
+allowed = ['user', 'me']
 
 [auth.user.locale]
 default = 'en'
