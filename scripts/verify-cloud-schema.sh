@@ -25,7 +25,7 @@ ROOT_FIELDS="$(curl -sf "${ENDPOINT}/v1/graphql" \
   -d "{\"query\":$(printf '%s' "$QUERY" | jq -Rs .)}")"
 
 missing=0
-for field in events threads thread_participants presence profiles airlines connections rosters notifications messages; do
+for field in events threads thread_participants presence profiles airlines activities connections rosters notifications messages; do
   if ! echo "${ROOT_FIELDS}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
     echo "MISSING on query_root: ${field}"
     missing=1

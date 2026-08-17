@@ -8,6 +8,14 @@ object_relationships:
   - name: user
     using:
       foreign_key_constraint_on: user_id
+array_relationships:
+  - name: activityPreferences
+    using:
+      foreign_key_constraint_on:
+        column: user_id
+        table:
+          name: profile_activity_preferences
+          schema: public
 select_permissions:
   - role: user
     permission:

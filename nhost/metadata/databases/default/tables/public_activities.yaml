@@ -1,0 +1,78 @@
+table:
+  name: activities
+  schema: public
+array_relationships:
+  - name: eventActivities
+    using:
+      foreign_key_constraint_on:
+        column: activity_id
+        table:
+          name: event_activities
+          schema: public
+  - name: profilePreferences
+    using:
+      foreign_key_constraint_on:
+        column: activity_id
+        table:
+          name: profile_activity_preferences
+          schema: public
+select_permissions:
+  - role: public
+    permission:
+      columns:
+        - id
+        - slug
+        - name
+        - description
+        - category
+        - icon
+        - sort_order
+        - is_active
+      filter:
+        is_active:
+          _eq: true
+  - role: user
+    permission:
+      columns:
+        - id
+        - slug
+        - name
+        - description
+        - category
+        - icon
+        - sort_order
+        - is_active
+      filter:
+        is_active:
+          _eq: true
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+insert_permissions:
+  - role: staff_admin
+    permission:
+      check: {}
+      columns:
+        - slug
+        - name
+        - description
+        - category
+        - icon
+        - sort_order
+        - is_active
+update_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - slug
+        - name
+        - description
+        - category
+        - icon
+        - sort_order
+        - is_active
+      filter: {}
+      check: {}
+delete_permissions: []

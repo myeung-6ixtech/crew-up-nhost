@@ -1,0 +1,61 @@
+table:
+  name: event_activities
+  schema: public
+object_relationships:
+  - name: event
+    using:
+      foreign_key_constraint_on: event_id
+  - name: activity
+    using:
+      foreign_key_constraint_on: activity_id
+select_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        event:
+          _or:
+            - visibility_scope:
+                _eq: all_verified
+            - _and:
+                - visibility_scope:
+                    _eq: same_airline
+                - creator:
+                    profile:
+                      airline_id:
+                        _eq: X-Hasura-Airline-Id
+                - creator:
+                    profile:
+                      airline_id:
+                        _is_null: false
+            - creator_id:
+                _eq: X-Hasura-User-Id
+            - attendees:
+                user_id:
+                  _eq: X-Hasura-User-Id
+            - thread:
+                participants:
+                  user_id:
+                    _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        event:
+          creator_id:
+            _eq: X-Hasura-User-Id
+      columns:
+        - event_id
+        - activity_id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        event:
+          creator_id:
+            _eq: X-Hasura-User-Id
