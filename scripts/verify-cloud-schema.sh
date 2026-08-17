@@ -202,5 +202,39 @@ if [[ "${missing}" -ne 0 ]]; then
   exit 1
 fi
 
+EVENTS_TYPE_QUERY='query { __type(name: "events") { fields { name } } }'
+EVENTS_TYPE="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":$(printf '%s' "$EVENTS_TYPE_QUERY" | jq -Rs .)}")"
+for field in host_type is_published published_at featured_until; do
+  if ! echo "${EVENTS_TYPE}" | jq -e --arg f "$field" '.data.__type.fields[] | select(.name == $f)' >/dev/null; then
+    echo "MISSING on events: ${field} (platform events migration)"
+    missing=1
+  else
+    echo "OK events.${field}"
+  fi
+done
+
+EVENT_HOST_TYPE_QUERY='query { __type(name: "event_host_type") { enumValues { name } } } }'
+EVENT_HOST_TYPE="$(curl -sf "${ENDPOINT}/v1/graphql" \
+  -H "x-hasura-admin-secret: ${ADMIN_SECRET}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":$(printf '%s' "$EVENT_HOST_TYPE_QUERY" | jq -Rs .)}")"
+for value in user platform; do
+  if ! echo "${EVENT_HOST_TYPE}" | jq -e --arg v "$value" '.data.__type.enumValues[] | select(.name == $v)' >/dev/null; then
+    echo "MISSING enum event_host_type value: ${value}"
+    missing=1
+  else
+    echo "OK event_host_type.${value}"
+  fi
+done
+
+if [[ "${missing}" -ne 0 ]]; then
+  echo ""
+  echo "Schema is incomplete. Run: npm run deploy:cloud"
+  exit 1
+fi
+
 echo ""
 echo "Schema check passed."

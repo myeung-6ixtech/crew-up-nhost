@@ -72,17 +72,23 @@ export async function graphqlAsUser<T>(
   query: string,
   authorization: string,
   variables?: Record<string, unknown>,
+  role?: string,
 ): Promise<T> {
   const nhost = createUserClient(authorization);
+  const headers: Record<string, string> = {
+    Authorization: authorization,
+  };
+  if (role) {
+    headers['x-hasura-role'] = role;
+  }
+
   const { body } = await nhost.graphql.request<GraphqlBody<T>>(
     {
       query,
       variables,
     },
     {
-      headers: {
-        Authorization: authorization,
-      },
+      headers,
     },
   );
 

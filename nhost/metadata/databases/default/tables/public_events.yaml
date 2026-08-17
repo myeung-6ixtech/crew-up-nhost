@@ -34,29 +34,38 @@ select_permissions:
     permission:
       columns: '*'
       filter:
-        _or:
-          - visibility_scope:
-              _eq: all_verified
-          - _and:
+        _and:
+          - _or:
+              - host_type:
+                  _eq: user
+              - _and:
+                  - host_type:
+                      _eq: platform
+                  - is_published:
+                      _eq: true
+          - _or:
               - visibility_scope:
-                  _eq: same_airline
-              - creator:
-                  profile:
-                    airline_id:
-                      _eq: X-Hasura-Airline-Id
-              - creator:
-                  profile:
-                    airline_id:
-                      _is_null: false
-          - creator_id:
-              _eq: X-Hasura-User-Id
-          - attendees:
-              user_id:
-                _eq: X-Hasura-User-Id
-          - thread:
-              participants:
-                user_id:
+                  _eq: all_verified
+              - _and:
+                  - visibility_scope:
+                      _eq: same_airline
+                  - creator:
+                      profile:
+                        airline_id:
+                          _eq: X-Hasura-Airline-Id
+                  - creator:
+                      profile:
+                        airline_id:
+                          _is_null: false
+              - creator_id:
                   _eq: X-Hasura-User-Id
+              - attendees:
+                  user_id:
+                    _eq: X-Hasura-User-Id
+              - thread:
+                  participants:
+                    user_id:
+                      _eq: X-Hasura-User-Id
   - role: staff_admin
     permission:
       columns: '*'
@@ -96,6 +105,29 @@ insert_permissions:
         - visibility_scope
         - tags
         - languages
+  - role: staff_admin
+    permission:
+      check:
+        host_type:
+          _eq: platform
+      set:
+        creator_id: X-Hasura-User-Id
+      columns:
+        - title
+        - description
+        - city
+        - venue_name
+        - venue_address
+        - starts_at
+        - ends_at
+        - capacity
+        - visibility_scope
+        - tags
+        - languages
+        - host_type
+        - is_published
+        - published_at
+        - featured_until
 update_permissions:
   - role: user
     permission:
@@ -112,12 +144,17 @@ update_permissions:
         - tags
         - languages
       filter:
-        creator_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - creator_id:
+              _eq: X-Hasura-User-Id
+          - host_type:
+              _eq: user
       check:
         _and:
           - creator_id:
               _eq: X-Hasura-User-Id
+          - host_type:
+              _eq: user
           - _or:
               - visibility_scope:
                   _neq: same_airline
@@ -131,9 +168,40 @@ update_permissions:
                           _eq: X-Hasura-User-Id
                       - airline_id:
                           _is_null: false
+  - role: staff_admin
+    permission:
+      columns:
+        - title
+        - description
+        - city
+        - venue_name
+        - venue_address
+        - starts_at
+        - ends_at
+        - capacity
+        - visibility_scope
+        - tags
+        - languages
+        - is_published
+        - published_at
+        - featured_until
+      filter:
+        host_type:
+          _eq: platform
+      check:
+        host_type:
+          _eq: platform
 delete_permissions:
   - role: user
     permission:
       filter:
-        creator_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - creator_id:
+              _eq: X-Hasura-User-Id
+          - host_type:
+              _eq: user
+  - role: staff_admin
+    permission:
+      filter:
+        host_type:
+          _eq: platform

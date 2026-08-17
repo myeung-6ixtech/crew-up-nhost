@@ -1,5 +1,5 @@
 - name: notification_digest_daily
-  webhook: '{{NHOST_FUNCTIONS_URL}}/notification-dispatch'
+  webhook: '{{NHOST_FUNCTIONS_URL}}/internal/notification-dispatch'
   schedule: 0 8 * * *
   include_in_metadata: true
   payload:

@@ -18,7 +18,7 @@ event_triggers:
       interval_sec: 10
       num_retries: 3
       timeout_sec: 60
-    webhook: '{{NHOST_FUNCTIONS_URL}}/notification-dispatch'
+    webhook: '{{NHOST_FUNCTIONS_URL}}/internal/notification-dispatch'
     headers:
       - name: nhost-webhook-secret
         value_from_env: NHOST_WEBHOOK_SECRET

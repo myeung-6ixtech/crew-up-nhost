@@ -5,9 +5,9 @@ import {
   verifyWebhookSecret,
   type HasuraEventPayload,
   type RosterRow,
-} from './_lib/auth.js';
-import { graphqlRaw } from './_lib/graphql.js';
-import { normalizeVisibilityForAffiliation } from './_lib/airlineClaim.js';
+} from '../_lib/auth.js';
+import { graphqlRaw } from '../_lib/graphql.js';
+import { normalizeVisibilityForAffiliation } from '../_lib/airlineClaim.js';
 
 interface ProfileRow {
   profiles_by_pk: {
@@ -146,7 +146,7 @@ export default async function presenceCompute(req: Request, res: Response) {
       ...result,
     });
   } catch (error) {
-    console.error('presence-compute error', error);
+    console.error('internal/presence-compute error', error);
     return res.status(500).json({
       message: error instanceof Error ? error.message : 'Failed to recompute presence',
     });

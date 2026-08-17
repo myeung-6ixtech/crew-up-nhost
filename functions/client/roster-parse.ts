@@ -4,8 +4,8 @@ import {
   requireAuthorization,
   unauthorized,
   type RosterParseEntry,
-} from './_lib/auth.js';
-import { graphqlAsUser } from './_lib/graphql.js';
+} from '../_lib/auth.js';
+import { graphqlAsUser } from '../_lib/graphql.js';
 
 interface ActionPayload {
   action: { name: string };
@@ -97,7 +97,7 @@ export default async function rosterParse(req: Request, res: Response) {
       return unauthorized(res);
     }
 
-    console.error('roster-parse error', error);
+    console.error('client/roster-parse error', error);
     return res.status(500).json({
       message: error instanceof Error ? error.message : 'Failed to parse roster',
     });

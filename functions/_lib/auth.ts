@@ -81,6 +81,58 @@ export function requireAuthorization(req: Request): string {
   return header;
 }
 
+const HASURA_CLAIMS_KEY = 'https://hasura.io/jwt/claims';
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const parts = token.replace(/^Bearer /, '').split('.');
+  if (parts.length < 2) return null;
+
+  try {
+    const json = Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(
+      'utf8',
+    );
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function getAllowedRolesFromToken(token: string): string[] {
+  const payload = decodeJwtPayload(token);
+  const claims = payload?.[HASURA_CLAIMS_KEY] as Record<string, unknown> | undefined;
+  const allowedRoles = claims?.['x-hasura-allowed-roles'];
+
+  if (Array.isArray(allowedRoles)) {
+    return allowedRoles.filter((role): role is string => typeof role === 'string');
+  }
+
+  if (typeof allowedRoles === 'string') {
+    return [allowedRoles];
+  }
+
+  return [];
+}
+
+export function requireStaffAdmin(req: Request): { authorization: string; userId: string } {
+  const authorization = requireAuthorization(req);
+  const token = authorization.replace(/^Bearer /, '');
+  const roles = getAllowedRolesFromToken(token);
+
+  if (!roles.includes('staff_admin')) {
+    throw new Error('Staff admin role required');
+  }
+
+  const payload = decodeJwtPayload(token);
+  const claims = payload?.[HASURA_CLAIMS_KEY] as Record<string, unknown> | undefined;
+  const userId = claims?.['x-hasura-user-id'];
+
+  if (typeof userId !== 'string') {
+    throw new Error('Invalid token');
+  }
+
+  return { authorization, userId };
+}
+
 export function unauthorized(res: { status: (code: number) => { json: (body: unknown) => void } }) {
   return res.status(401).json({ message: 'Unauthorized' });
 }

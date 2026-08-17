@@ -6,8 +6,8 @@ import {
   verifyWebhookSecret,
   type HasuraEventPayload,
   type MessageRow,
-} from './_lib/auth.js';
-import { graphqlRaw } from './_lib/graphql.js';
+} from '../_lib/auth.js';
+import { graphqlRaw } from '../_lib/graphql.js';
 
 interface ThreadParticipants {
   thread_participants: Array<{ user_id: string }>;
@@ -149,7 +149,7 @@ export default async function notificationDispatch(req: Request, res: Response) 
     const result = await notifyMessageParticipants(message);
     return res.status(200).json({ message: 'Message notifications dispatched', ...result });
   } catch (error) {
-    console.error('notification-dispatch error', error);
+    console.error('internal/notification-dispatch error', error);
     return res.status(500).json({
       message: error instanceof Error ? error.message : 'Failed to dispatch notifications',
     });

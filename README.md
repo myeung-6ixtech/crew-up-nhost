@@ -173,16 +173,18 @@ INSERT INTO auth.user_roles (user_id, role) VALUES ('<uuid>', 'staff_admin');
 
 | Mutation | Function | Purpose |
 |---|---|---|
-| `parseRoster(fileId: uuid!)` | `/v1/functions/roster-parse` | Mock/heuristic roster parse for confirmation |
-| `submitReport(...)` | `/v1/functions/moderation-webhook` | Create safety report |
+| `parseRoster(fileId: uuid!)` | `/v1/client/roster-parse` | Mock/heuristic roster parse for confirmation |
+| `submitReport(...)` | `/v1/client/submit-report` | Create safety report |
+
+Admin portal also calls `POST /v1/admin/events/create` (not a Hasura Action) to create platform-hosted events.
 
 ## Event triggers & cron
 
 | Trigger | Table / schedule | Function |
 |---|---|---|
-| `rosters_presence_compute` | `rosters` insert/update/delete | `presence-compute` |
-| `messages_notify` | `messages` insert | `notification-dispatch` |
-| `notification_digest_daily` | `0 8 * * *` | `notification-dispatch` (`mode: digest`) |
+| `rosters_presence_compute` | `rosters` insert/update/delete | `/v1/internal/presence-compute` |
+| `messages_notify` | `messages` insert | `/v1/internal/notification-dispatch` |
+| `notification_digest_daily` | `0 8 * * *` | `/v1/internal/notification-dispatch` (`mode: digest`) |
 
 Event/cron calls require header `nhost-webhook-secret` = `NHOST_WEBHOOK_SECRET`.
 
@@ -190,10 +192,10 @@ Event/cron calls require header `nhost-webhook-secret` = `NHOST_WEBHOOK_SECRET`.
 
 ```bash
 # OAuth stubs
-curl -i https://local.functions.local.nhost.run/v1/oauth-wechat
+curl -i https://local.functions.local.nhost.run/v1/client/oauth-wechat
 
 # parseRoster (requires user JWT)
-curl -i https://local.functions.local.nhost.run/v1/roster-parse \
+curl -i https://local.functions.local.nhost.run/v1/client/roster-parse \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"action":{"name":"parseRoster"},"input":{"fileId":"00000000-0000-0000-0000-000000000001"},"session_variables":{}}'

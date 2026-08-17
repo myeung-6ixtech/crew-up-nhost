@@ -2,7 +2,7 @@ actions:
   - name: parseRoster
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/roster-parse'
+      handler: '{{NHOST_FUNCTIONS_URL}}/client/roster-parse'
       forward_client_headers: true
     permissions:
       - role: user
@@ -10,7 +10,7 @@ actions:
   - name: submitReport
     definition:
       kind: synchronous
-      handler: '{{NHOST_FUNCTIONS_URL}}/moderation-webhook'
+      handler: '{{NHOST_FUNCTIONS_URL}}/client/submit-report'
       forward_client_headers: true
     permissions:
       - role: user

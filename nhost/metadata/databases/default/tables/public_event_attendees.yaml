@@ -28,8 +28,18 @@ insert_permissions:
   - role: user
     permission:
       check:
-        user_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - user_id:
+              _eq: X-Hasura-User-Id
+          - event:
+              _or:
+                - host_type:
+                    _eq: user
+                - _and:
+                    - host_type:
+                        _eq: platform
+                    - is_published:
+                        _eq: true
       set:
         user_id: X-Hasura-User-Id
       columns:

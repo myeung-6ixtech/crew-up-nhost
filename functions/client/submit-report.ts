@@ -3,8 +3,8 @@ import {
   badRequest,
   requireAuthorization,
   unauthorized,
-} from './_lib/auth.js';
-import { graphqlAsUser } from './_lib/graphql.js';
+} from '../_lib/auth.js';
+import { graphqlAsUser } from '../_lib/graphql.js';
 
 interface SubmitReportInput {
   reason: string;
@@ -20,7 +20,7 @@ interface ActionPayload {
   session_variables: Record<string, string>;
 }
 
-export default async function moderationWebhook(req: Request, res: Response) {
+export default async function submitReport(req: Request, res: Response) {
   try {
     const authorization = requireAuthorization(req);
     const payload = req.body as ActionPayload;
@@ -73,7 +73,7 @@ export default async function moderationWebhook(req: Request, res: Response) {
       return unauthorized(res);
     }
 
-    console.error('moderation-webhook error', error);
+    console.error('client/submit-report error', error);
     return res.status(500).json({
       message: error instanceof Error ? error.message : 'Failed to submit report',
     });

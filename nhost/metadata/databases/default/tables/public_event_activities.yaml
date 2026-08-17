@@ -52,6 +52,15 @@ insert_permissions:
       columns:
         - event_id
         - activity_id
+  - role: staff_admin
+    permission:
+      check:
+        event:
+          host_type:
+            _eq: platform
+      columns:
+        - event_id
+        - activity_id
 delete_permissions:
   - role: user
     permission:
@@ -59,3 +68,9 @@ delete_permissions:
         event:
           creator_id:
             _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      filter:
+        event:
+          host_type:
+            _eq: platform
