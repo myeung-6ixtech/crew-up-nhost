@@ -39,6 +39,10 @@ CREATE TABLE IF NOT EXISTS public.user_trips (
   )
 );
 
+-- Cloud may already have user_trips without newer columns; IF NOT EXISTS skips table creation.
+ALTER TABLE public.user_trips
+  ADD COLUMN IF NOT EXISTS idempotency_key uuid;
+
 CREATE INDEX IF NOT EXISTS user_trips_user_time_idx
   ON public.user_trips (user_id, starts_at, ends_at);
 
