@@ -1,0 +1,76 @@
+table:
+  name: trip_stays
+  schema: public
+object_relationships:
+  - name: trip
+    using:
+      foreign_key_constraint_on: trip_id
+event_triggers:
+  - name: trip_stays_match_compute
+    definition:
+      enable_manual: false
+      insert:
+        columns: '*'
+      update:
+        columns: '*'
+      delete:
+        columns: '*'
+    retry_conf:
+      interval_sec: 10
+      num_retries: 3
+      timeout_sec: 120
+    webhook: '{{NHOST_FUNCTIONS_URL}}/internal/trip-matches-compute'
+    headers:
+      - name: nhost-webhook-secret
+        value_from_env: NHOST_WEBHOOK_SECRET
+select_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        trip:
+          user_id:
+            _eq: X-Hasura-User-Id
+insert_permissions:
+  - role: user
+    permission:
+      check:
+        trip:
+          user_id:
+            _eq: X-Hasura-User-Id
+      columns:
+        - trip_id
+        - city
+        - airport_iata
+        - starts_at
+        - ends_at
+  - role: service
+    permission:
+      check: {}
+      columns: '*'
+update_permissions:
+  - role: user
+    permission:
+      columns:
+        - city
+        - airport_iata
+        - starts_at
+        - ends_at
+      filter:
+        trip:
+          user_id:
+            _eq: X-Hasura-User-Id
+      check:
+        trip:
+          user_id:
+            _eq: X-Hasura-User-Id
+delete_permissions:
+  - role: user
+    permission:
+      filter:
+        trip:
+          user_id:
+            _eq: X-Hasura-User-Id
+  - role: service
+    permission:
+      filter: {}

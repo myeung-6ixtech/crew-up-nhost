@@ -1,0 +1,53 @@
+table:
+  name: trip_matches
+  schema: public
+object_relationships:
+  - name: matchedUser
+    using:
+      foreign_key_constraint_on: matched_user_id
+  - name: sourceTrip
+    using:
+      foreign_key_constraint_on: source_trip_id
+  - name: matchedTrip
+    using:
+      foreign_key_constraint_on: matched_trip_id
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - matched_user_id
+        - match_type
+        - score
+        - source_trip_id
+        - matched_trip_id
+        - city
+        - flight_number
+        - departure_airport
+        - arrival_airport
+        - overlap_start
+        - overlap_end
+        - created_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+insert_permissions:
+  - role: service
+    permission:
+      check: {}
+      columns: '*'
+update_permissions:
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+      check: {}
+delete_permissions:
+  - role: service
+    permission:
+      filter: {}

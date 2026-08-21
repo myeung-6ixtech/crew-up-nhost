@@ -54,6 +54,45 @@ export interface MessageRow {
   body?: string | null;
 }
 
+export interface UserTripRow {
+  id: string;
+  user_id: string;
+  title?: string | null;
+  source?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  visibility?: string | null;
+  is_active?: boolean | null;
+  idempotency_key?: string | null;
+}
+
+export interface TripStayRow {
+  id: string;
+  trip_id: string;
+  city: string;
+  airport_iata?: string | null;
+  starts_at: string;
+  ends_at: string;
+}
+
+export interface TripFlightLegRow {
+  id: string;
+  trip_id: string;
+  flight_instance_id: string;
+  sequence_number: number;
+}
+
+export interface FlightInstanceRow {
+  id: string;
+  airline_iata?: string | null;
+  flight_number: string;
+  service_date: string;
+  departure_airport: string;
+  arrival_airport: string;
+  scheduled_departure: string;
+  scheduled_arrival: string;
+}
+
 function hash(value: string): Buffer {
   return createHash('sha256').update(value).digest();
 }
@@ -128,6 +167,31 @@ export function requireStaffAdmin(req: Request): { authorization: string; userId
 
   if (typeof userId !== 'string') {
     throw new Error('Invalid token');
+  }
+
+  return { authorization, userId };
+}
+
+export function requireUser(req: Request): { authorization: string; userId: string } {
+  const authorization = requireAuthorization(req);
+  const token = authorization.replace(/^Bearer /, '');
+  const payload = decodeJwtPayload(token);
+  const claims = payload?.[HASURA_CLAIMS_KEY] as Record<string, unknown> | undefined;
+  const userId = claims?.['x-hasura-user-id'];
+  const defaultRole = claims?.['x-hasura-default-role'];
+
+  if (typeof userId !== 'string') {
+    throw new Error('Invalid token');
+  }
+
+  const roles = getAllowedRolesFromToken(token);
+  if (
+    !roles.includes('user') &&
+    !roles.includes('me') &&
+    defaultRole !== 'user' &&
+    defaultRole !== 'me'
+  ) {
+    throw new Error('User role required');
   }
 
   return { authorization, userId };

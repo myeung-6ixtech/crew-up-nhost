@@ -1,0 +1,44 @@
+table:
+  name: flight_instances
+  schema: public
+array_relationships:
+  - name: tripLegs
+    using:
+      foreign_key_constraint_on:
+        column: flight_instance_id
+        table:
+          name: trip_flight_legs
+          schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - id
+        - airline_iata
+        - flight_number
+        - service_date
+        - departure_airport
+        - arrival_airport
+        - scheduled_departure
+        - scheduled_arrival
+      filter:
+        tripLegs:
+          trip:
+            user_id:
+              _eq: X-Hasura-User-Id
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+insert_permissions:
+  - role: service
+    permission:
+      check: {}
+      columns: '*'
+update_permissions:
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+      check: {}
