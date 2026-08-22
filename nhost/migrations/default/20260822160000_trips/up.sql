@@ -77,6 +77,19 @@ CREATE TABLE IF NOT EXISTS public.flight_instances (
   CONSTRAINT flight_instances_time_check CHECK (scheduled_arrival >= scheduled_departure)
 );
 
+-- Cloud flight_instances may omit provider columns added in source-controlled schema.
+ALTER TABLE public.flight_instances
+  ADD COLUMN IF NOT EXISTS provider text,
+  ADD COLUMN IF NOT EXISTS provider_flight_id text,
+  ADD COLUMN IF NOT EXISTS provider_snapshot jsonb DEFAULT '{}'::jsonb;
+
+UPDATE public.flight_instances
+SET provider_snapshot = '{}'::jsonb
+WHERE provider_snapshot IS NULL;
+
+ALTER TABLE public.flight_instances
+  ALTER COLUMN provider_snapshot SET DEFAULT '{}'::jsonb;
+
 CREATE UNIQUE INDEX IF NOT EXISTS flight_instances_identity_unique
   ON public.flight_instances (flight_number, service_date, departure_airport, scheduled_departure);
 

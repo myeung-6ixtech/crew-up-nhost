@@ -2,6 +2,22 @@
 -- Flight-duty rows become trips with canonical legs only (no automatic stay from flight duration).
 -- Valid layover rows become trip_stays.
 
+-- Reconcile columns if trips migration ran against a pre-existing cloud schema.
+ALTER TABLE public.user_trips
+  ADD COLUMN IF NOT EXISTS idempotency_key uuid;
+
+ALTER TABLE public.flight_instances
+  ADD COLUMN IF NOT EXISTS provider text,
+  ADD COLUMN IF NOT EXISTS provider_flight_id text,
+  ADD COLUMN IF NOT EXISTS provider_snapshot jsonb DEFAULT '{}'::jsonb;
+
+UPDATE public.flight_instances
+SET provider_snapshot = '{}'::jsonb
+WHERE provider_snapshot IS NULL;
+
+ALTER TABLE public.flight_instances
+  ALTER COLUMN provider_snapshot SET DEFAULT '{}'::jsonb;
+
 INSERT INTO public.user_trips (user_id, title, source, starts_at, ends_at, visibility, is_active)
 SELECT
   r.user_id,
