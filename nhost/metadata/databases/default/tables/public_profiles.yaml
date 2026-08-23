@@ -32,6 +32,7 @@ select_permissions:
         - notification_mode
         - is_verified
         - avatar_file_id
+        - friend_id
         - created_at
         - updated_at
       filter:

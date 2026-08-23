@@ -12,7 +12,8 @@
     "deploy:auth": "bash scripts/deploy-auth-config.sh",
     "deploy:all": "bash scripts/deploy-all.sh",
     "verify:schema": "bash scripts/verify-cloud-schema.sh",
-    "test:trips": "node --experimental-strip-types --test scripts/trip-selection.test.mjs"
+    "test:trips": "node --experimental-strip-types --test scripts/trip-selection.test.mjs",
+    "test:connections": "node --experimental-strip-types --test scripts/connection-requests.test.mjs"
   },
   "devDependencies": {
     "@nhost/cli": "^1.45.0"
