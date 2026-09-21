@@ -1,7 +1,32 @@
+type GraphqlError = {
+  message: string;
+  extensions?: {
+    code?: string;
+    /**
+     * Hasura reports Postgres failures as a bare "database query error" and puts
+     * the real cause in here. Only the message and SQLSTATE are surfaced; the
+     * sibling `arguments` and `statement` fields echo row data back and are
+     * deliberately left out of the thrown error.
+     */
+    internal?: {
+      error?: { message?: string; status_code?: string };
+    };
+  };
+};
+
 type GraphqlBody<T> = {
   data?: T;
-  errors?: Array<{ message: string }>;
+  errors?: GraphqlError[];
 };
+
+function describeError(error: GraphqlError): string {
+  const detail = error.extensions?.internal?.error;
+  if (!detail?.message) {
+    return error.message;
+  }
+  const sqlState = detail.status_code ? ` (SQLSTATE ${detail.status_code})` : '';
+  return `${error.message}: ${detail.message}${sqlState}`;
+}
 
 /**
  * Matches the `local`/`localhost` subdomains used by `nhost up`, optionally
@@ -67,7 +92,7 @@ async function executeGraphql<T>(
   }
 
   if (body.errors?.length) {
-    throw new Error(body.errors.map((error) => error.message).join('; '));
+    throw new Error(body.errors.map(describeError).join('; '));
   }
 
   if (!body.data) {
