@@ -1,0 +1,28 @@
+table:
+  name: flight_search_cache
+  schema: public
+select_permissions:
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+insert_permissions:
+  - role: service
+    permission:
+      check: {}
+      columns: '*'
+update_permissions:
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+      check: {}
+delete_permissions:
+  - role: service
+    permission:
+      filter: {}

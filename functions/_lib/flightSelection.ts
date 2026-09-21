@@ -69,7 +69,3 @@ export function normalizeFlightNumber(value: string): string {
 export function normalizeIata(value: string): string {
   return value.trim().toUpperCase();
 }
-
-export function serviceDateFromIso(iso: string): string {
-  return iso.slice(0, 10);
-}

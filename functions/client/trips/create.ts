@@ -5,7 +5,11 @@ import {
   unauthorized,
   type UserTripRow,
 } from '../../_lib/auth.js';
-import { verifyFlightSelectionToken } from '../../_lib/flightSelection.js';
+import {
+  normalizeFlightNumber,
+  normalizeIata,
+  verifyFlightSelectionToken,
+} from '../../_lib/flightSelection.js';
 import { graphqlRaw } from '../../_lib/graphql.js';
 import { recomputeTripMatches } from '../../_lib/tripMatching.js';
 
@@ -16,13 +20,26 @@ interface StayInput {
   ends_at: string;
 }
 
-interface LegInput {
-  selection_token: string;
+interface ManualLegInput {
+  flight_number: string;
+  airline_iata?: string | null;
+  departure_airport: string;
+  arrival_airport: string;
+  /** Local departure date of the airline service day (YYYY-MM-DD). */
+  service_date: string;
+  /** UTC instants; the client converts from airport-local input. */
+  scheduled_departure: string;
+  scheduled_arrival: string;
 }
 
-async function upsertFlightInstance(input: {
-  airlineIata?: string | null;
+interface LegInput {
+  selection_token?: string;
+  manual?: ManualLegInput;
+}
+
+interface ResolvedLeg {
   flightNumber: string;
+  airlineIata?: string | null;
   serviceDate: string;
   departureAirport: string;
   arrivalAirport: string;
@@ -30,66 +47,122 @@ async function upsertFlightInstance(input: {
   scheduledArrival: string;
   provider?: string | null;
   providerFlightId?: string | null;
-}): Promise<string> {
-  const existing = await graphqlRaw<{
-    flight_instances: Array<{ id: string }>;
+}
+
+function parseUtcInstant(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+/**
+ * Manual entry keeps Add Trip usable when a provider has no coverage, so it is
+ * validated to the same shape a signed selection token would produce rather than
+ * trusting arbitrary client data.
+ */
+function resolveManualLeg(manual: ManualLegInput, index: number): ResolvedLeg {
+  const flightNumber = normalizeFlightNumber(String(manual.flight_number ?? ''));
+  const departureAirport = normalizeIata(String(manual.departure_airport ?? ''));
+  const arrivalAirport = normalizeIata(String(manual.arrival_airport ?? ''));
+  const serviceDate = typeof manual.service_date === 'string' ? manual.service_date.trim() : '';
+  const scheduledDeparture = parseUtcInstant(manual.scheduled_departure);
+  const scheduledArrival = parseUtcInstant(manual.scheduled_arrival);
+  const airlineIata = normalizeIata(String(manual.airline_iata ?? ''));
+
+  if (!/^[A-Z0-9]{2,8}$/.test(flightNumber)) {
+    throw new Error(`legs[${index}].manual.flight_number is required`);
+  }
+  if (!/^[A-Z]{3}$/.test(departureAirport) || !/^[A-Z]{3}$/.test(arrivalAirport)) {
+    throw new Error(`legs[${index}].manual airport codes are required`);
+  }
+  if (departureAirport === arrivalAirport) {
+    throw new Error(`legs[${index}].manual departure and arrival must differ`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(serviceDate)) {
+    throw new Error(`legs[${index}].manual.service_date is required`);
+  }
+  if (!scheduledDeparture || !scheduledArrival) {
+    throw new Error(`legs[${index}].manual scheduled times are required`);
+  }
+  if (Date.parse(scheduledArrival) < Date.parse(scheduledDeparture)) {
+    throw new Error(`legs[${index}].manual arrival must be after departure`);
+  }
+  if (airlineIata && !/^[A-Z0-9]{2,3}$/.test(airlineIata)) {
+    throw new Error(`legs[${index}].manual.airline_iata is invalid`);
+  }
+
+  return {
+    flightNumber,
+    airlineIata: airlineIata || null,
+    serviceDate,
+    departureAirport,
+    arrivalAirport,
+    scheduledDeparture,
+    scheduledArrival,
+    provider: 'manual',
+    providerFlightId: null,
+  };
+}
+
+function resolveLeg(leg: LegInput, index: number): ResolvedLeg {
+  if (leg?.selection_token) {
+    return verifyFlightSelectionToken(leg.selection_token);
+  }
+  if (leg?.manual) {
+    return resolveManualLeg(leg.manual, index);
+  }
+  throw new Error(`legs[${index}] requires selection_token or manual flight details`);
+}
+
+async function upsertFlightInstance(leg: ResolvedLeg): Promise<string> {
+  // Race-safe: the tracked SQL function performs INSERT ... ON CONFLICT on the
+  // canonical identity key, so concurrent saves of the same flight converge.
+  const result = await graphqlRaw<{
+    upsert_flight_instance_row: Array<{ id: string }>;
   }>(
     `
-      query ExistingFlight(
+      mutation UpsertFlightInstance(
         $flightNumber: String!
         $serviceDate: date!
         $departureAirport: String!
+        $arrivalAirport: String!
         $scheduledDeparture: timestamptz!
+        $scheduledArrival: timestamptz!
+        $airlineIata: String
+        $provider: String
+        $providerFlightId: String
       ) {
-        flight_instances(
-          where: {
-            flight_number: { _eq: $flightNumber }
-            service_date: { _eq: $serviceDate }
-            departure_airport: { _eq: $departureAirport }
-            scheduled_departure: { _eq: $scheduledDeparture }
+        upsert_flight_instance_row(
+          args: {
+            p_flight_number: $flightNumber
+            p_service_date: $serviceDate
+            p_departure_airport: $departureAirport
+            p_arrival_airport: $arrivalAirport
+            p_scheduled_departure: $scheduledDeparture
+            p_scheduled_arrival: $scheduledArrival
+            p_airline_iata: $airlineIata
+            p_provider: $provider
+            p_provider_flight_id: $providerFlightId
           }
-          limit: 1
         ) {
           id
         }
       }
     `,
     {
-      flightNumber: input.flightNumber,
-      serviceDate: input.serviceDate,
-      departureAirport: input.departureAirport,
-      scheduledDeparture: input.scheduledDeparture,
+      flightNumber: leg.flightNumber,
+      serviceDate: leg.serviceDate,
+      departureAirport: leg.departureAirport,
+      arrivalAirport: leg.arrivalAirport,
+      scheduledDeparture: leg.scheduledDeparture,
+      scheduledArrival: leg.scheduledArrival,
+      airlineIata: leg.airlineIata ?? null,
+      provider: leg.provider ?? null,
+      providerFlightId: leg.providerFlightId ?? null,
     },
   );
 
-  if (existing.flight_instances[0]?.id) {
-    return existing.flight_instances[0].id;
-  }
-
-  const inserted = await graphqlRaw<{ insert_flight_instances_one: { id: string } | null }>(
-    `
-      mutation InsertFlightInstance($object: flight_instances_insert_input!) {
-        insert_flight_instances_one(object: $object) {
-          id
-        }
-      }
-    `,
-    {
-      object: {
-        airline_iata: input.airlineIata,
-        flight_number: input.flightNumber,
-        service_date: input.serviceDate,
-        departure_airport: input.departureAirport,
-        arrival_airport: input.arrivalAirport,
-        scheduled_departure: input.scheduledDeparture,
-        scheduled_arrival: input.scheduledArrival,
-        provider: input.provider,
-        provider_flight_id: input.providerFlightId,
-      },
-    },
-  );
-
-  const id = inserted.insert_flight_instances_one?.id;
+  const id = result.upsert_flight_instance_row[0]?.id;
   if (!id) throw new Error('Failed to upsert flight instance');
   return id;
 }
@@ -163,14 +236,9 @@ export default async function createTrip(req: Request, res: Response) {
       }
     }
 
-    const verifiedLegs = legs.map((leg, index) => {
-      if (!leg?.selection_token) {
-        throw new Error(`legs[${index}].selection_token is required`);
-      }
-      return verifyFlightSelectionToken(leg.selection_token);
-    });
+    const resolvedLegs = legs.map(resolveLeg);
 
-    if (!verifiedLegs.length && !stays.length) {
+    if (!resolvedLegs.length && !stays.length) {
       return badRequest(res, 'At least one flight leg or stay is required');
     }
 
@@ -183,8 +251,17 @@ export default async function createTrip(req: Request, res: Response) {
       }
     }
 
-    const bounds = computeTripBounds(verifiedLegs, stays);
+    const bounds = computeTripBounds(resolvedLegs, stays);
 
+    // Canonical flights are shared and deduplicated, so upserting them before the
+    // trip is safe to repeat and keeps the trip write itself a single transaction.
+    const flightInstanceIds: string[] = [];
+    for (const leg of resolvedLegs) {
+      flightInstanceIds.push(await upsertFlightInstance(leg));
+    }
+
+    // One mutation so Hasura commits the trip with all of its legs and stays
+    // atomically; a partial failure can no longer leave an empty trip in My Trips.
     const tripResult = await graphqlRaw<{ insert_user_trips_one: UserTripRow | null }>(
       `
         mutation InsertTrip($object: user_trips_insert_input!) {
@@ -206,6 +283,20 @@ export default async function createTrip(req: Request, res: Response) {
           starts_at: bounds.startsAt,
           ends_at: bounds.endsAt,
           idempotency_key: idempotencyKey,
+          flightLegs: {
+            data: flightInstanceIds.map((flightInstanceId, index) => ({
+              flight_instance_id: flightInstanceId,
+              sequence_number: index + 1,
+            })),
+          },
+          stays: {
+            data: stays.map((stay) => ({
+              city: stay.city.trim().toUpperCase(),
+              airport_iata: stay.airport_iata?.trim().toUpperCase() ?? null,
+              starts_at: stay.starts_at,
+              ends_at: stay.ends_at,
+            })),
+          },
         },
       },
     );
@@ -213,59 +304,6 @@ export default async function createTrip(req: Request, res: Response) {
     const trip = tripResult.insert_user_trips_one;
     if (!trip?.id) {
       return res.status(500).json({ message: 'Failed to create trip' });
-    }
-
-    for (let index = 0; index < verifiedLegs.length; index += 1) {
-      const leg = verifiedLegs[index];
-      const flightInstanceId = await upsertFlightInstance({
-        airlineIata: leg.airlineIata,
-        flightNumber: leg.flightNumber,
-        serviceDate: leg.serviceDate,
-        departureAirport: leg.departureAirport,
-        arrivalAirport: leg.arrivalAirport,
-        scheduledDeparture: leg.scheduledDeparture,
-        scheduledArrival: leg.scheduledArrival,
-        provider: leg.provider,
-        providerFlightId: leg.providerFlightId,
-      });
-
-      await graphqlRaw(
-        `
-          mutation InsertLeg($object: trip_flight_legs_insert_input!) {
-            insert_trip_flight_legs_one(object: $object) {
-              id
-            }
-          }
-        `,
-        {
-          object: {
-            trip_id: trip.id,
-            flight_instance_id: flightInstanceId,
-            sequence_number: index + 1,
-          },
-        },
-      );
-    }
-
-    for (const stay of stays) {
-      await graphqlRaw(
-        `
-          mutation InsertStay($object: trip_stays_insert_input!) {
-            insert_trip_stays_one(object: $object) {
-              id
-            }
-          }
-        `,
-        {
-          object: {
-            trip_id: trip.id,
-            city: stay.city.trim().toUpperCase(),
-            airport_iata: stay.airport_iata?.trim().toUpperCase() ?? null,
-            starts_at: stay.starts_at,
-            ends_at: stay.ends_at,
-          },
-        },
-      );
     }
 
     void recomputeTripMatches(trip.id).catch((error) => {
@@ -297,6 +335,9 @@ export default async function createTrip(req: Request, res: Response) {
       });
     }
     if (error instanceof Error && error.message.includes('required')) {
+      return badRequest(res, error.message);
+    }
+    if (error instanceof Error && error.message.startsWith('legs[')) {
       return badRequest(res, error.message);
     }
     console.error('client/trips/create error', error);

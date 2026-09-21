@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { badRequest, requireUser, unauthorized } from '../../_lib/auth.js';
-import { searchFlights } from '../../_lib/flightProviders.js';
+import { getFlightSearchResults } from '../../_lib/flightSearchCache.js';
 
 export default async function flightSearch(req: Request, res: Response) {
   const startedAt = Date.now();
@@ -68,25 +68,34 @@ export default async function flightSearch(req: Request, res: Response) {
       hasSelectionSigningSecret: Boolean(process.env.FLIGHT_SELECTION_SIGNING_SECRET?.trim()),
     });
 
-    const flights = await searchFlights(
+    const outcome = await getFlightSearchResults(
       {
         depIata: departureAirport,
         arrIata: arrivalAirport,
         flightDate,
       },
-      { requestId },
+      { requestId, log },
     );
 
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     log('info', 'search_completed', {
       status: 200,
-      flightCount: flights.length,
-      empty: flights.length === 0,
+      cached: outcome.cached,
+      provider: outcome.provider,
+      flightCount: outcome.flights.length,
+      empty: outcome.flights.length === 0,
+      cacheAgeMs: outcome.cacheAgeMs,
+      cacheExpiresAt: outcome.cacheExpiresAt,
+      selectionExpiresAt: outcome.selectionExpiresAt,
     });
+
     return res.status(200).json({
       search_id: randomUUID(),
-      expires_at: expiresAt,
-      flights: flights.map((flight) => ({
+      cached: outcome.cached,
+      // Selection tokens expire before the cache row, so the client must treat
+      // this as the deadline for completing Add Trip.
+      expires_at: outcome.selectionExpiresAt,
+      cache_expires_at: outcome.cacheExpiresAt,
+      flights: outcome.flights.map((flight) => ({
         result_id: flight.resultId,
         selection_token: flight.selectionToken,
         flight_number: flight.flightNumber,
@@ -113,7 +122,7 @@ export default async function flightSearch(req: Request, res: Response) {
     if (message.startsWith('FLIGHT_API_')) {
       log('warn', 'search_failed', { status: 503, stage: 'provider', code: message });
       return res.status(503).json({
-        error: { code: message, message: 'Flight lookup is unavailable right now.' },
+        error: { code: 'FLIGHT_SCHEDULE_UNAVAILABLE', message: 'Flight schedules are unavailable right now.' },
       });
     }
     if (message === 'INVALID_REQUEST') {
@@ -128,8 +137,8 @@ export default async function flightSearch(req: Request, res: Response) {
       });
       return res.status(503).json({
         error: {
-          code: 'FLIGHT_SELECTION_NOT_CONFIGURED',
-          message: 'Flight selection is unavailable right now.',
+          code: 'FLIGHT_SCHEDULE_UNAVAILABLE',
+          message: 'Flight schedules are unavailable right now.',
         },
       });
     }

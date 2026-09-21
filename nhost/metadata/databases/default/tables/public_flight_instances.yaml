@@ -26,6 +26,10 @@ select_permissions:
           trip:
             user_id:
               _eq: X-Hasura-User-Id
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
   - role: staff_admin
     permission:
       columns: '*'

@@ -1,9 +1,4 @@
-import {
-  createFlightSelectionToken,
-  normalizeFlightNumber,
-  normalizeIata,
-  serviceDateFromIso,
-} from './flightSelection.js';
+import { normalizeFlightNumber, normalizeIata } from './flightSelection.js';
 
 export interface FlightSearchParams {
   depIata: string;
@@ -15,22 +10,41 @@ export interface FlightSearchDiagnostics {
   requestId?: string;
 }
 
-export interface NormalizedFlightResult {
-  resultId: string;
-  selectionToken: string;
+export type FlightProviderName = 'aerodatabox' | 'aviationstack';
+
+/**
+ * Cacheable schedule record. Deliberately excludes selection tokens: tokens are
+ * short-lived and minted per response so a cached row can never hand a client an
+ * already-expired token.
+ */
+export interface FlightScheduleRecord {
   flightNumber: string;
   airlineIata?: string | null;
   airlineName: string;
+  serviceDate: string;
   departureAirport: string;
   arrivalAirport: string;
   scheduledDeparture: string;
   scheduledArrival: string;
   status?: string | null;
+  provider: FlightProviderName;
+  providerFlightId: string;
+}
+
+export interface FlightScheduleSearchResult {
+  provider: FlightProviderName;
+  schedules: FlightScheduleRecord[];
 }
 
 const DEFAULT_AERODATABOX_HOST = 'aerodatabox.p.rapidapi.com';
-const MIN_REQUEST_GAP_MS = 1500;
+const DEFAULT_MIN_REQUEST_GAP_MS = 1500;
 const RATE_LIMIT_RETRY_DELAY_MS = 2000;
+
+/** Spacing between upstream calls, tunable for provider plans and for tests. */
+function minRequestGapMs(): number {
+  const raw = Number(process.env.FLIGHT_PROVIDER_MIN_REQUEST_GAP_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_MIN_REQUEST_GAP_MS;
+}
 
 let requestChain: Promise<void> = Promise.resolve();
 let lastRequestFinishedAt = 0;
@@ -57,7 +71,7 @@ function delay(ms: number): Promise<void> {
 
 function scheduleRequest<T>(run: () => Promise<T>): Promise<T> {
   const scheduled = requestChain.then(async () => {
-    const waitFor = lastRequestFinishedAt + MIN_REQUEST_GAP_MS - Date.now();
+    const waitFor = lastRequestFinishedAt + minRequestGapMs() - Date.now();
     if (waitFor > 0) await delay(waitFor);
     try {
       return await run();
@@ -79,19 +93,29 @@ function readNumericHeader(response: Response, name: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function movementUtc(movement: Record<string, unknown> | undefined): string | null {
-  for (const key of ['revisedTime', 'scheduledTime'] as const) {
-    const time = movement?.[key] as Record<string, unknown> | undefined;
-    const utc = typeof time?.utc === 'string' ? time.utc.trim() : '';
-    if (!utc) continue;
+function toUtcIso(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = new Date(trimmed.replace(' ', 'T'));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
 
-    const parsed = new Date(utc.replace(' ', 'T'));
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+/**
+ * CrewUp pairs published schedules, so the scheduled time wins over any
+ * operational revision. Revised times are only a fallback when a provider omits
+ * the scheduled value entirely.
+ */
+function movementUtc(movement: Record<string, unknown> | undefined): string | null {
+  for (const key of ['scheduledTime', 'revisedTime'] as const) {
+    const time = movement?.[key] as Record<string, unknown> | undefined;
+    const utc = toUtcIso(time?.utc);
+    if (utc) return utc;
   }
   return null;
 }
 
-function resolveProvider(): 'aerodatabox' | 'aviationstack' {
+export function resolveProvider(): FlightProviderName {
   const configured = process.env.FLIGHT_PROVIDER?.trim().toLowerCase();
   if (configured === 'aviationstack' || configured === 'aerodatabox') {
     return configured;
@@ -99,6 +123,22 @@ function resolveProvider(): 'aerodatabox' | 'aviationstack' {
   if (process.env.RAPIDAPI_KEY?.trim()) return 'aerodatabox';
   if (process.env.AVIATIONSTACK_API_KEY?.trim()) return 'aviationstack';
   return 'aerodatabox';
+}
+
+export function validateFlightSearchParams(params: FlightSearchParams): FlightSearchParams {
+  const depIata = normalizeIata(params.depIata);
+  const arrIata = normalizeIata(params.arrIata);
+  if (!/^[A-Z]{3}$/.test(depIata) || !/^[A-Z]{3}$/.test(arrIata) || depIata === arrIata) {
+    throw new Error('INVALID_REQUEST');
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(params.flightDate)) {
+    throw new Error('INVALID_REQUEST');
+  }
+  const parsedDate = new Date(`${params.flightDate}T00:00:00Z`);
+  if (Number.isNaN(parsedDate.getTime())) {
+    throw new Error('INVALID_REQUEST');
+  }
+  return { depIata, arrIata, flightDate: params.flightDate };
 }
 
 async function requestAeroDataBoxWindow(
@@ -206,7 +246,7 @@ async function requestAeroDataBoxWindow(
 async function searchAeroDataBox(
   params: FlightSearchParams,
   diagnostics: FlightSearchDiagnostics,
-): Promise<NormalizedFlightResult[]> {
+): Promise<FlightScheduleRecord[]> {
   const apiKey = process.env.RAPIDAPI_KEY?.trim();
   const host = process.env.RAPIDAPI_AERODATABOX_HOST?.trim() || DEFAULT_AERODATABOX_HOST;
   if (!apiKey) throw new Error('FLIGHT_API_NOT_CONFIGURED');
@@ -214,6 +254,8 @@ async function searchAeroDataBox(
   const depIata = normalizeIata(params.depIata);
   const arrIata = normalizeIata(params.arrIata);
   const dateKey = params.flightDate;
+  // The endpoint caps each query at 12 hours of local departure time, so a full
+  // local service day needs two windows.
   const windows = [
     { from: `${dateKey}T00:00`, to: `${dateKey}T11:59` },
     { from: `${dateKey}T12:00`, to: `${dateKey}T23:59` },
@@ -234,7 +276,7 @@ async function searchAeroDataBox(
   }
 
   const seen = new Set<string>();
-  const results: NormalizedFlightResult[] = [];
+  const results: FlightScheduleRecord[] = [];
   const arrivalIatas = new Set<string>();
   const filtered = {
     arrivalMismatch: 0,
@@ -257,24 +299,22 @@ async function searchAeroDataBox(
     }
 
     const departure = entry.departure as Record<string, unknown> | undefined;
-    const depUtc = movementUtc(departure);
-    const arrUtc = movementUtc(arrival);
+    const scheduledDeparture = movementUtc(departure);
+    const scheduledArrival = movementUtc(arrival);
     const flightNumber = normalizeFlightNumber(String(entry.number ?? ''));
     if (!flightNumber) {
       filtered.missingFlightNumber += 1;
       continue;
     }
-    if (!depUtc) {
+    if (!scheduledDeparture) {
       filtered.missingDepartureTime += 1;
       continue;
     }
-    if (!arrUtc) {
+    if (!scheduledArrival) {
       filtered.missingArrivalTime += 1;
       continue;
     }
 
-    const scheduledDeparture = depUtc;
-    const scheduledArrival = arrUtc;
     const dedupeKey = `${flightNumber}-${scheduledDeparture}`;
     if (seen.has(dedupeKey)) {
       filtered.duplicate += 1;
@@ -283,31 +323,22 @@ async function searchAeroDataBox(
     seen.add(dedupeKey);
 
     const airline = entry.airline as Record<string, string> | undefined;
-    const airlineIata = airline?.iata ?? null;
-    const resultId = dedupeKey;
-    const selectionToken = createFlightSelectionToken({
-      flightNumber,
-      airlineIata,
-      serviceDate: serviceDateFromIso(scheduledDeparture),
-      departureAirport: depIata,
-      arrivalAirport: arrIata,
-      scheduledDeparture,
-      scheduledArrival,
-      provider: 'aerodatabox',
-      providerFlightId: resultId,
-    });
 
     results.push({
-      resultId,
-      selectionToken,
       flightNumber,
-      airlineIata,
+      airlineIata: airline?.iata ?? null,
       airlineName: airline?.name ?? 'Airline',
+      // The windows above are local departure times, so the requested date is the
+      // airline service day. Slicing the UTC instant would misdate flights that
+      // depart near local midnight.
+      serviceDate: dateKey,
       departureAirport: depIata,
       arrivalAirport: arrIata,
       scheduledDeparture,
       scheduledArrival,
       status: typeof entry.status === 'string' ? entry.status : null,
+      provider: 'aerodatabox',
+      providerFlightId: dedupeKey,
     });
   }
 
@@ -324,6 +355,7 @@ async function searchAeroDataBox(
     provider: 'aerodatabox',
     departureAirport: depIata,
     requestedArrivalAirport: arrIata,
+    flightDate: dateKey,
     rawDepartureCount: departures.length,
     returnedFlightCount: results.length,
     emptyReason,
@@ -339,7 +371,7 @@ async function searchAeroDataBox(
 async function searchAviationstack(
   params: FlightSearchParams,
   diagnostics: FlightSearchDiagnostics,
-): Promise<NormalizedFlightResult[]> {
+): Promise<FlightScheduleRecord[]> {
   const accessKey = process.env.AVIATIONSTACK_API_KEY?.trim();
   if (!accessKey) throw new Error('FLIGHT_API_NOT_CONFIGURED');
 
@@ -359,11 +391,22 @@ async function searchAviationstack(
     arrIata,
     flightDate: params.flightDate,
   });
+
   const response = await fetch(url.toString());
-  const payload = (await response.json()) as {
+  let payload: {
     data?: Array<Record<string, unknown>>;
     error?: { code?: string; message?: string };
   };
+  try {
+    payload = (await response.json()) as typeof payload;
+  } catch {
+    logProvider('error', 'upstream_invalid_json', diagnostics, {
+      provider: 'aviationstack',
+      status: response.status,
+    });
+    throw new Error('FLIGHT_API_REQUEST_FAILED');
+  }
+
   logProvider(response.ok ? 'info' : 'warn', 'upstream_response_received', diagnostics, {
     provider: 'aviationstack',
     status: response.status,
@@ -375,51 +418,74 @@ async function searchAviationstack(
   if (payload.error?.code === 'function_access_restricted') {
     throw new Error('FLIGHT_API_PLAN_LIMIT');
   }
+  if (response.status === 429) throw new Error('FLIGHT_API_RATE_LIMIT');
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('FLIGHT_API_NOT_CONFIGURED');
+  }
   if (!response.ok) throw new Error('FLIGHT_API_REQUEST_FAILED');
 
-  const results: NormalizedFlightResult[] = [];
+  const seen = new Set<string>();
+  const results: FlightScheduleRecord[] = [];
+  const filtered = {
+    missingFlightNumber: 0,
+    missingDepartureTime: 0,
+    missingArrivalTime: 0,
+    duplicate: 0,
+  };
+
   for (const entry of payload.data ?? []) {
     const flight = entry.flight as Record<string, string> | undefined;
     const departure = entry.departure as Record<string, string> | undefined;
     const arrival = entry.arrival as Record<string, string> | undefined;
     const flightNumber = normalizeFlightNumber(flight?.iata ?? flight?.number ?? '');
-    const scheduledDeparture = departure?.scheduled;
-    const scheduledArrival = arrival?.scheduled;
-    if (!flightNumber || !scheduledDeparture || !scheduledArrival) continue;
+    const scheduledDeparture = toUtcIso(departure?.scheduled);
+    const scheduledArrival = toUtcIso(arrival?.scheduled);
 
-    const dep = normalizeIata(departure?.iata ?? depIata);
-    const arr = normalizeIata(arrival?.iata ?? arrIata);
-    const resultId = `${flightNumber}-${scheduledDeparture}`;
+    if (!flightNumber) {
+      filtered.missingFlightNumber += 1;
+      continue;
+    }
+    if (!scheduledDeparture) {
+      filtered.missingDepartureTime += 1;
+      continue;
+    }
+    if (!scheduledArrival) {
+      filtered.missingArrivalTime += 1;
+      continue;
+    }
+
+    const dedupeKey = `${flightNumber}-${scheduledDeparture}`;
+    if (seen.has(dedupeKey)) {
+      filtered.duplicate += 1;
+      continue;
+    }
+    seen.add(dedupeKey);
+
     const airline = entry.airline as Record<string, string> | undefined;
 
     results.push({
-      resultId,
-      selectionToken: createFlightSelectionToken({
-        flightNumber,
-        airlineIata: null,
-        serviceDate: params.flightDate,
-        departureAirport: dep,
-        arrivalAirport: arr,
-        scheduledDeparture: new Date(scheduledDeparture).toISOString(),
-        scheduledArrival: new Date(scheduledArrival).toISOString(),
-        provider: 'aviationstack',
-        providerFlightId: resultId,
-      }),
       flightNumber,
-      airlineIata: null,
+      airlineIata: normalizeIata(airline?.iata ?? '') || null,
       airlineName: airline?.name ?? 'Airline',
-      departureAirport: dep,
-      arrivalAirport: arr,
-      scheduledDeparture: new Date(scheduledDeparture).toISOString(),
-      scheduledArrival: new Date(scheduledArrival).toISOString(),
+      serviceDate: params.flightDate,
+      departureAirport: normalizeIata(departure?.iata ?? depIata),
+      arrivalAirport: normalizeIata(arrival?.iata ?? arrIata),
+      scheduledDeparture,
+      scheduledArrival,
       status: typeof entry.flight_status === 'string' ? entry.flight_status : null,
+      provider: 'aviationstack',
+      providerFlightId: dedupeKey,
     });
   }
 
   logProvider(results.length > 0 ? 'info' : 'warn', 'normalization_completed', diagnostics, {
     provider: 'aviationstack',
+    departureAirport: depIata,
+    requestedArrivalAirport: arrIata,
+    flightDate: params.flightDate,
     rawFlightCount: payload.data?.length ?? 0,
     returnedFlightCount: results.length,
+    filtered,
     emptyReason:
       results.length > 0
         ? null
@@ -433,30 +499,28 @@ async function searchAviationstack(
   );
 }
 
-export async function searchFlights(
+/**
+ * Fetches normalized schedules straight from the upstream provider. Callers are
+ * responsible for caching; see `flightSearchCache.ts` for the cache-aside path.
+ */
+export async function searchFlightSchedules(
   params: FlightSearchParams,
   diagnostics: FlightSearchDiagnostics = {},
-): Promise<NormalizedFlightResult[]> {
-  const depIata = normalizeIata(params.depIata);
-  const arrIata = normalizeIata(params.arrIata);
-  if (!/^[A-Z]{3}$/.test(depIata) || !/^[A-Z]{3}$/.test(arrIata) || depIata === arrIata) {
-    throw new Error('INVALID_REQUEST');
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(params.flightDate)) {
-    throw new Error('INVALID_REQUEST');
-  }
-  if (!process.env.FLIGHT_SELECTION_SIGNING_SECRET?.trim()) {
-    throw new Error('FLIGHT_SELECTION_SIGNING_SECRET is not configured');
-  }
-
+): Promise<FlightScheduleSearchResult> {
+  const validated = validateFlightSearchParams(params);
   const provider = resolveProvider();
+
   logProvider('info', 'provider_selected', diagnostics, {
     provider,
-    departureAirport: depIata,
-    arrivalAirport: arrIata,
-    flightDate: params.flightDate,
+    departureAirport: validated.depIata,
+    arrivalAirport: validated.arrIata,
+    flightDate: validated.flightDate,
   });
-  return provider === 'aviationstack'
-    ? searchAviationstack({ ...params, depIata, arrIata }, diagnostics)
-    : searchAeroDataBox({ ...params, depIata, arrIata }, diagnostics);
+
+  const schedules =
+    provider === 'aviationstack'
+      ? await searchAviationstack(validated, diagnostics)
+      : await searchAeroDataBox(validated, diagnostics);
+
+  return { provider, schedules };
 }

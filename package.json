@@ -13,6 +13,7 @@
     "deploy:all": "bash scripts/deploy-all.sh",
     "verify:schema": "bash scripts/verify-cloud-schema.sh",
     "test:trips": "node --experimental-strip-types --test scripts/trip-selection.test.mjs",
+    "test:flights": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/flight-schedules.test.mjs",
     "test:connections": "node --experimental-strip-types --test scripts/connection-requests.test.mjs"
   },
   "devDependencies": {

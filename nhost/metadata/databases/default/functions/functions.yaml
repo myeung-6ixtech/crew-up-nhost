@@ -1,0 +1,7 @@
+- function:
+    name: upsert_flight_instance_row
+    schema: public
+  configuration:
+    exposed_as: mutation
+  permissions:
+    - role: service

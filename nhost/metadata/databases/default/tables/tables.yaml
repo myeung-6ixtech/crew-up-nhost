@@ -18,6 +18,7 @@
 - "!include public_presence.yaml"
 - "!include public_user_trips.yaml"
 - "!include public_flight_instances.yaml"
+- "!include public_flight_search_cache.yaml"
 - "!include public_trip_flight_legs.yaml"
 - "!include public_trip_stays.yaml"
 - "!include public_trip_matches.yaml"
