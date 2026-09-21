@@ -31,6 +31,10 @@ select_permissions:
         trip:
           user_id:
             _eq: X-Hasura-User-Id
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 insert_permissions:
   - role: user
     permission:
@@ -64,6 +68,11 @@ update_permissions:
         trip:
           user_id:
             _eq: X-Hasura-User-Id
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+      check: {}
 delete_permissions:
   - role: user
     permission:

@@ -59,6 +59,10 @@ select_permissions:
         - role_type
         - is_verified
       filter: {}
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 insert_permissions:
   - role: user
     permission:

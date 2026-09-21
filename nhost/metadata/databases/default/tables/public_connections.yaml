@@ -23,6 +23,10 @@ select_permissions:
       columns: '*'
       filter: {}
       allow_aggregations: true
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 insert_permissions:
   - role: user
     permission:
@@ -34,6 +38,10 @@ insert_permissions:
       columns:
         - addressee_id
         - message
+  - role: service
+    permission:
+      check: {}
+      columns: '*'
 update_permissions:
   - role: user
     permission:
@@ -46,3 +54,8 @@ update_permissions:
           - addressee_id:
               _eq: X-Hasura-User-Id
       check: null
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+      check: {}

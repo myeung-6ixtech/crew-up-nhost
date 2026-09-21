@@ -36,6 +36,10 @@ select_permissions:
       columns: '*'
       filter: {}
       allow_aggregations: true
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 insert_permissions:
   - role: service
     permission:

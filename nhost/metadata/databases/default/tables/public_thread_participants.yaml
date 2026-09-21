@@ -17,6 +17,10 @@ select_permissions:
           participants:
             user_id:
               _eq: X-Hasura-User-Id
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 insert_permissions:
   - role: user
     permission:

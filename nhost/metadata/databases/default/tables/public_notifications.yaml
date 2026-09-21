@@ -18,6 +18,10 @@ select_permissions:
       columns: '*'
       filter: {}
       allow_aggregations: true
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 update_permissions:
   - role: user
     permission:
