@@ -68,6 +68,13 @@ export default async function flightSearch(req: Request, res: Response) {
       hasSelectionSigningSecret: Boolean(process.env.FLIGHT_SELECTION_SIGNING_SECRET?.trim()),
     });
 
+    // Selection tokens are minted as the final step of a search, so checking the
+    // signing secret up front avoids spending a metered provider lookup on a
+    // request that cannot succeed.
+    if (!process.env.FLIGHT_SELECTION_SIGNING_SECRET?.trim()) {
+      throw new Error('FLIGHT_SELECTION_SIGNING_SECRET is not configured');
+    }
+
     const outcome = await getFlightSearchResults(
       {
         depIata: departureAirport,

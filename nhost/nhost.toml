@@ -1,5 +1,25 @@
 [global]
 
+# Nhost injects its own NHOST_* variables into functions automatically. Anything
+# else the functions runtime reads must be declared here, otherwise
+# `process.env` is undefined even when the value exists in `.secrets`.
+
+[[global.environment]]
+name = 'FLIGHT_PROVIDER'
+value = '{{ secrets.FLIGHT_PROVIDER }}'
+
+[[global.environment]]
+name = 'RAPIDAPI_KEY'
+value = '{{ secrets.RAPIDAPI_KEY }}'
+
+[[global.environment]]
+name = 'RAPIDAPI_AERODATABOX_HOST'
+value = '{{ secrets.RAPIDAPI_AERODATABOX_HOST }}'
+
+[[global.environment]]
+name = 'FLIGHT_SELECTION_SIGNING_SECRET'
+value = '{{ secrets.FLIGHT_SELECTION_SIGNING_SECRET }}'
+
 [hasura]
 version = 'v2.48.10-ce'
 adminSecret = '{{ secrets.HASURA_GRAPHQL_ADMIN_SECRET }}'

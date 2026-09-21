@@ -1,61 +1,70 @@
-import { createClient, withAdminSession } from '@nhost/nhost-js';
-
 type GraphqlBody<T> = {
   data?: T;
   errors?: Array<{ message: string }>;
 };
 
-function createAdminClient() {
-  const adminSecret = process.env.NHOST_ADMIN_SECRET;
-  const region = process.env.NHOST_REGION;
-  const subdomain = process.env.NHOST_SUBDOMAIN;
+/**
+ * Matches the `local`/`localhost` subdomains used by `nhost up`, optionally
+ * prefixed with a protocol and suffixed with a port.
+ */
+const LOCAL_SUBDOMAIN_PATTERN = /^(?:(https?):\/\/)?(localhost|local)(?::(\d+))?$/;
 
-  if (!adminSecret || !region || !subdomain) {
-    throw new Error('Missing Nhost admin client environment variables');
-  }
+/**
+ * Resolves the Hasura GraphQL endpoint from the environment Nhost injects into
+ * every function. `NHOST_GRAPHQL_URL` wins when set so local overrides and
+ * self-hosted deployments keep working.
+ */
+function graphqlEndpoint(): string {
+  const explicit = process.env.NHOST_GRAPHQL_URL?.trim();
+  if (explicit) return explicit;
 
-  return createClient({
-    region,
-    subdomain,
-    configure: [
-      withAdminSession({
-        adminSecret,
-      }),
-    ],
-  });
-}
-
-function createUserClient(authorization: string) {
-  const region = process.env.NHOST_REGION;
-  const subdomain = process.env.NHOST_SUBDOMAIN;
-
-  if (!region || !subdomain) {
+  const subdomain = process.env.NHOST_SUBDOMAIN?.trim();
+  if (!subdomain) {
     throw new Error('Missing Nhost client environment variables');
   }
 
-  return createClient({
-    region,
-    subdomain,
-  });
+  const local = LOCAL_SUBDOMAIN_PATTERN.exec(subdomain);
+  if (local) {
+    const [, protocol, host, port] = local;
+    if (host === 'localhost') {
+      return `${protocol ?? 'http'}://localhost:${port ?? '1337'}/v1/graphql`;
+    }
+    const authority = port
+      ? `local.graphql.local.nhost.run:${port}`
+      : 'local.graphql.local.nhost.run';
+    return `${protocol ?? 'https'}://${authority}/v1`;
+  }
+
+  const region = process.env.NHOST_REGION?.trim();
+  if (!region) {
+    throw new Error('Missing Nhost client environment variables');
+  }
+  return `https://${subdomain}.graphql.${region}.nhost.run/v1`;
 }
 
-export async function graphqlAsAdmin<T>(
+async function executeGraphql<T>(
   query: string,
-  variables?: Record<string, unknown>,
-  role = 'service',
+  variables: Record<string, unknown> | undefined,
+  headers: Record<string, string>,
 ): Promise<T> {
-  const nhost = createAdminClient();
-  const { body } = await nhost.graphql.request<GraphqlBody<T>>(
-    {
-      query,
-      variables,
-    },
-    {
-      headers: {
-        'x-hasura-role': role,
-      },
-    },
-  );
+  const response = await fetch(graphqlEndpoint(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify({ query, variables }),
+  });
+
+  const raw = await response.text();
+
+  if (!response.ok) {
+    throw new Error(`GraphQL request failed with status ${response.status}: ${raw.slice(0, 500)}`);
+  }
+
+  let body: GraphqlBody<T>;
+  try {
+    body = JSON.parse(raw) as GraphqlBody<T>;
+  } catch {
+    throw new Error(`GraphQL response was not valid JSON: ${raw.slice(0, 500)}`);
+  }
 
   if (body.errors?.length) {
     throw new Error(body.errors.map((error) => error.message).join('; '));
@@ -66,6 +75,22 @@ export async function graphqlAsAdmin<T>(
   }
 
   return body.data;
+}
+
+export async function graphqlAsAdmin<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+  role = 'service',
+): Promise<T> {
+  const adminSecret = process.env.NHOST_ADMIN_SECRET?.trim();
+  if (!adminSecret) {
+    throw new Error('Missing Nhost admin client environment variables');
+  }
+
+  return executeGraphql<T>(query, variables, {
+    'x-hasura-admin-secret': adminSecret,
+    'x-hasura-role': role,
+  });
 }
 
 export async function graphqlAsUser<T>(
@@ -74,33 +99,12 @@ export async function graphqlAsUser<T>(
   variables?: Record<string, unknown>,
   role?: string,
 ): Promise<T> {
-  const nhost = createUserClient(authorization);
-  const headers: Record<string, string> = {
-    Authorization: authorization,
-  };
+  const headers: Record<string, string> = { authorization };
   if (role) {
     headers['x-hasura-role'] = role;
   }
 
-  const { body } = await nhost.graphql.request<GraphqlBody<T>>(
-    {
-      query,
-      variables,
-    },
-    {
-      headers,
-    },
-  );
-
-  if (body.errors?.length) {
-    throw new Error(body.errors.map((error) => error.message).join('; '));
-  }
-
-  if (!body.data) {
-    throw new Error('GraphQL response missing data');
-  }
-
-  return body.data;
+  return executeGraphql<T>(query, variables, headers);
 }
 
 export async function graphqlRaw<T>(
