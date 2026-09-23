@@ -173,7 +173,7 @@ INSERT INTO auth.user_roles (user_id, role) VALUES ('<uuid>', 'staff_admin');
 
 | Mutation | Function | Purpose |
 |---|---|---|
-| `parseRoster(fileId: uuid!)` | `/v1/client/roster-parse` | Mock/heuristic roster parse for confirmation |
+| `parseRoster(fileId: uuid!)` | `/v1/client/roster-parse` | PDF text → redaction → Gemini Flash-Lite → layovers for confirmation |
 | `submitReport(...)` | `/v1/client/submit-report` | Create safety report |
 
 Admin portal also calls `POST /v1/admin/events/create` (not a Hasura Action) to create platform-hosted events.
@@ -210,7 +210,7 @@ Cloud: `nhost secrets create|update` per environment.
 | Variable | Used by |
 |---|---|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Nhost Auth → Google OAuth provider |
-| `OCR_PROVIDER_API_KEY` | `roster-parse` (stub checks presence) |
+| `ROSTER_LLM_PROVIDER`, `GEMINI_API_KEY`, `ROSTER_LLM_MODEL`, `ROSTER_LLM_ALLOW_RAW_FILES` | `roster-parse` — see `documentation/features/gemini-flash-lite.md`. Free-tier keys: synthetic rosters only |
 | `FCM_SERVER_KEY` / `APNS_KEY` | `notification-dispatch` (push stub) |
 | `NHOST_WEBHOOK_SECRET` | Event triggers + cron |
 | `NHOST_ADMIN_SECRET` | Functions → Hasura `service` role |

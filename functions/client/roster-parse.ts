@@ -1,11 +1,12 @@
 import type { Request, Response } from 'express';
-import {
-  badRequest,
-  requireAuthorization,
-  unauthorized,
-  type RosterParseEntry,
-} from '../_lib/auth.js';
+import { badRequest, requireAuthorization, unauthorized } from '../_lib/auth.js';
 import { graphqlAsUser } from '../_lib/graphql.js';
+import { RosterImportError } from '../_lib/rosterErrors.js';
+import { extractRosterDuties, rosterLlmConfig, type RosterLlmInput } from '../_lib/rosterLlm.js';
+import { extractPdfText } from '../_lib/rosterPdf.js';
+import { redactRosterText } from '../_lib/rosterRedact.js';
+import { PARSER_VERSION, layoversFromExtraction } from '../_lib/rosterSchema.js';
+import { downloadFileAsUser } from '../_lib/storage.js';
 
 interface ActionPayload {
   action: { name: string };
@@ -22,35 +23,60 @@ interface StorageFileRow {
   } | null;
 }
 
-function mockParseEntries(fileName: string): RosterParseEntry[] {
-  const now = new Date();
-  const start = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const end = new Date(start.getTime() + 36 * 60 * 60 * 1000);
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_PDF_PAGES = 20;
+/** Below this, a PDF is treated as a scan with no usable text layer. */
+const MIN_TEXT_CHARS = 200;
+const IMAGE_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/heic', 'image/heif']);
 
-  return [
-    {
-      flightNumber: 'SQ123',
-      departureAirport: 'SIN',
-      arrivalAirport: 'BKK',
-      layoverCity: 'Bangkok',
-      layoverStart: start.toISOString(),
-      layoverEnd: end.toISOString(),
-    },
-    {
-      flightNumber: 'SQ124',
-      departureAirport: 'BKK',
-      arrivalAirport: 'SIN',
-      layoverCity: 'Singapore',
-      layoverStart: new Date(end.getTime() + 12 * 60 * 60 * 1000).toISOString(),
-      layoverEnd: new Date(end.getTime() + 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ].map((entry) => ({
-    ...entry,
-    flightNumber: fileName.includes('mock') ? entry.flightNumber : entry.flightNumber,
-  }));
+function log(level: 'info' | 'warn' | 'error', event: string, details: Record<string, unknown> = {}) {
+  console[level](JSON.stringify({ scope: 'client/roster-parse', event, ...details }));
+}
+
+/** Hasura surfaces `message` and `extensions` from a non-2xx action response as the GraphQL error. */
+function rosterError(res: Response, error: RosterImportError) {
+  return res.status(error.statusCode).json({
+    message: error.message,
+    extensions: { code: error.code },
+  });
+}
+
+async function modelInput(
+  bytes: Buffer,
+  mimeType: string,
+  allowRawFiles: boolean,
+): Promise<{ input: RosterLlmInput; pages: number | null; redactedLines: number }> {
+  if (mimeType === 'application/pdf') {
+    let extracted: { text: string; pages: number };
+    try {
+      extracted = await extractPdfText(bytes, MAX_PDF_PAGES);
+    } catch (error) {
+      if (error instanceof RosterImportError) throw error;
+      throw new RosterImportError('ROSTER_PARSE_INVALID', 'PDF could not be opened');
+    }
+
+    if (extracted.text.replace(/\s/g, '').length >= MIN_TEXT_CHARS) {
+      const { text, redactedLines } = redactRosterText(extracted.text);
+      return { input: { kind: 'text', text }, pages: extracted.pages, redactedLines };
+    }
+    if (allowRawFiles) {
+      return { input: { kind: 'file', mimeType, bytes }, pages: extracted.pages, redactedLines: 0 };
+    }
+    throw new RosterImportError('ROSTER_TEXT_UNAVAILABLE', 'PDF has no text layer');
+  }
+
+  if (IMAGE_MIME_TYPES.has(mimeType)) {
+    if (allowRawFiles) {
+      return { input: { kind: 'file', mimeType, bytes }, pages: null, redactedLines: 0 };
+    }
+    throw new RosterImportError('ROSTER_TEXT_UNAVAILABLE', 'Image rosters need raw file mode');
+  }
+
+  throw new RosterImportError('ROSTER_FILE_UNSUPPORTED', `Unsupported type ${mimeType}`, 415);
 }
 
 export default async function rosterParse(req: Request, res: Response) {
+  const startedAt = Date.now();
   try {
     const authorization = requireAuthorization(req);
     const payload = req.body as ActionPayload;
@@ -84,22 +110,46 @@ export default async function rosterParse(req: Request, res: Response) {
       return badRequest(res, 'File must be uploaded to the rosters bucket');
     }
 
-    const ocrConfigured = Boolean(process.env.OCR_PROVIDER_API_KEY);
-    const entries = mockParseEntries(file.name ?? 'roster');
+    const config = rosterLlmConfig();
+    if (!config.enabled) {
+      throw new RosterImportError('ROSTER_PARSER_UNAVAILABLE', 'Roster LLM is not configured', 503);
+    }
 
-    return res.status(200).json({
-      sourceFileId: file.id,
-      entries,
-      parser: ocrConfigured ? 'mock-with-ocr-configured' : 'mock',
+    const mimeType = (file.mime_type ?? '').toLowerCase();
+    if (mimeType !== 'application/pdf' && !IMAGE_MIME_TYPES.has(mimeType)) {
+      throw new RosterImportError('ROSTER_FILE_UNSUPPORTED', `Unsupported type ${mimeType}`, 415);
+    }
+
+    const bytes = await downloadFileAsUser(file.id, authorization, MAX_FILE_BYTES);
+    const { input, pages, redactedLines } = await modelInput(bytes, mimeType, config.allowRawFiles);
+    const result = await extractRosterDuties(input);
+    const entries = layoversFromExtraction(result.extraction);
+
+    log('info', 'parsed', {
+      parser: PARSER_VERSION,
+      model: result.model,
+      inputKind: input.kind,
+      pages,
+      redactedLines,
+      duties: result.extraction.duties.length,
+      layovers: entries.length,
+      warnings: result.extraction.warnings.length,
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      latencyMs: Date.now() - startedAt,
     });
+
+    return res.status(200).json({ sourceFileId: file.id, entries });
   } catch (error) {
+    if (error instanceof RosterImportError) {
+      log('warn', 'parse_failed', { code: error.code, reason: error.message, latencyMs: Date.now() - startedAt });
+      return rosterError(res, error);
+    }
     if (error instanceof Error && error.message.includes('Authorization')) {
       return unauthorized(res);
     }
 
-    console.error('client/roster-parse error', error);
-    return res.status(500).json({
-      message: error instanceof Error ? error.message : 'Failed to parse roster',
-    });
+    log('error', 'parse_error', { reason: error instanceof Error ? error.message : 'unknown' });
+    return res.status(500).json({ message: 'Failed to parse roster' });
   }
 }

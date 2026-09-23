@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@nhost/nhost-js": "^3.3.0"
+    "@nhost/nhost-js": "^3.3.0",
+    "unpdf": "^1.8.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

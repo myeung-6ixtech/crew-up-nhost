@@ -20,6 +20,22 @@ value = '{{ secrets.RAPIDAPI_AERODATABOX_HOST }}'
 name = 'FLIGHT_SELECTION_SIGNING_SECRET'
 value = '{{ secrets.FLIGHT_SELECTION_SIGNING_SECRET }}'
 
+[[global.environment]]
+name = 'ROSTER_LLM_PROVIDER'
+value = '{{ secrets.ROSTER_LLM_PROVIDER }}'
+
+[[global.environment]]
+name = 'GEMINI_API_KEY'
+value = '{{ secrets.GEMINI_API_KEY }}'
+
+[[global.environment]]
+name = 'ROSTER_LLM_MODEL'
+value = '{{ secrets.ROSTER_LLM_MODEL }}'
+
+[[global.environment]]
+name = 'ROSTER_LLM_ALLOW_RAW_FILES'
+value = '{{ secrets.ROSTER_LLM_ALLOW_RAW_FILES }}'
+
 [hasura]
 version = 'v2.48.10-ce'
 adminSecret = '{{ secrets.HASURA_GRAPHQL_ADMIN_SECRET }}'

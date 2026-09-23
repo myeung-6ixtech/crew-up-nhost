@@ -34,14 +34,21 @@ function describeError(error: GraphqlError): string {
  */
 const LOCAL_SUBDOMAIN_PATTERN = /^(?:(https?):\/\/)?(localhost|local)(?::(\d+))?$/;
 
+type NhostService = 'graphql' | 'storage';
+
+const EXPLICIT_URL_ENV: Record<NhostService, string> = {
+  graphql: 'NHOST_GRAPHQL_URL',
+  storage: 'NHOST_STORAGE_URL',
+};
+
 /**
- * Resolves the Hasura GraphQL endpoint from the environment Nhost injects into
- * every function. `NHOST_GRAPHQL_URL` wins when set so local overrides and
- * self-hosted deployments keep working.
+ * Resolves an Nhost service base URL from the environment Nhost injects into
+ * every function. `NHOST_GRAPHQL_URL` / `NHOST_STORAGE_URL` win when set so
+ * local overrides and self-hosted deployments keep working.
  */
-function graphqlEndpoint(): string {
-  const explicit = process.env.NHOST_GRAPHQL_URL?.trim();
-  if (explicit) return explicit;
+export function nhostServiceUrl(service: NhostService): string {
+  const explicit = process.env[EXPLICIT_URL_ENV[service]]?.trim();
+  if (explicit) return explicit.replace(/\/$/, '');
 
   const subdomain = process.env.NHOST_SUBDOMAIN?.trim();
   if (!subdomain) {
@@ -52,11 +59,11 @@ function graphqlEndpoint(): string {
   if (local) {
     const [, protocol, host, port] = local;
     if (host === 'localhost') {
-      return `${protocol ?? 'http'}://localhost:${port ?? '1337'}/v1/graphql`;
+      return `${protocol ?? 'http'}://localhost:${port ?? '1337'}/v1/${service}`;
     }
     const authority = port
-      ? `local.graphql.local.nhost.run:${port}`
-      : 'local.graphql.local.nhost.run';
+      ? `local.${service}.local.nhost.run:${port}`
+      : `local.${service}.local.nhost.run`;
     return `${protocol ?? 'https'}://${authority}/v1`;
   }
 
@@ -64,7 +71,11 @@ function graphqlEndpoint(): string {
   if (!region) {
     throw new Error('Missing Nhost client environment variables');
   }
-  return `https://${subdomain}.graphql.${region}.nhost.run/v1`;
+  return `https://${subdomain}.${service}.${region}.nhost.run/v1`;
+}
+
+function graphqlEndpoint(): string {
+  return nhostServiceUrl('graphql');
 }
 
 async function executeGraphql<T>(
