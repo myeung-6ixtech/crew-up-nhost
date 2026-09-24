@@ -13,11 +13,22 @@ select_permissions:
     permission:
       columns: '*'
       filter:
-        _or:
-          - requester_id:
-              _eq: X-Hasura-User-Id
-          - addressee_id:
-              _eq: X-Hasura-User-Id
+        _and:
+          - _or:
+              - requester_id:
+                  _eq: X-Hasura-User-Id
+              - addressee_id:
+                  _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
   - role: staff_admin
     permission:
       columns: '*'
@@ -31,8 +42,19 @@ insert_permissions:
   - role: user
     permission:
       check:
-        requester_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - requester_id:
+              _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       set:
         requester_id: X-Hasura-User-Id
       columns:
@@ -48,11 +70,22 @@ update_permissions:
       columns:
         - status
       filter:
-        _or:
-          - requester_id:
-              _eq: X-Hasura-User-Id
-          - addressee_id:
-              _eq: X-Hasura-User-Id
+        _and:
+          - _or:
+              - requester_id:
+                  _eq: X-Hasura-User-Id
+              - addressee_id:
+                  _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       check: null
   - role: service
     permission:

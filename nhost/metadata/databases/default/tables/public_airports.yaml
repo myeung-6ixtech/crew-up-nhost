@@ -1,41 +1,39 @@
 table:
-  name: airlines
+  name: airports
   schema: public
-array_relationships:
-  - name: profiles
-    using:
-      foreign_key_constraint_on:
-        column: airline_id
-        table:
-          name: profiles
-          schema: public
 select_permissions:
   - role: public
     permission:
       columns:
-        - id
-        - code
+        - iata
         - icao
         - name
+        - city
         - country_code
-        - is_active
+        - tz
+        - is_major
       filter:
         is_active:
           _eq: true
   - role: user
     permission:
       columns:
-        - id
-        - code
+        - iata
         - icao
         - name
+        - city
         - country_code
-        - email_domains
-        - is_active
+        - tz
+        - is_major
       filter:
         is_active:
           _eq: true
   - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+  - role: service
     permission:
       columns: '*'
       filter: {}
@@ -44,21 +42,24 @@ insert_permissions:
     permission:
       check: {}
       columns:
-        - code
+        - iata
         - icao
         - name
+        - city
         - country_code
-        - email_domains
+        - tz
+        - is_major
         - is_active
 update_permissions:
   - role: staff_admin
     permission:
       columns:
-        - code
         - icao
         - name
+        - city
         - country_code
-        - email_domains
+        - tz
+        - is_major
         - is_active
       filter: {}
       check: {}

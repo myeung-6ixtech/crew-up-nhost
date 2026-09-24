@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { OnboardingError, assertOnboarded, sendOnboardingError } from '../../_lib/onboarding.js';
 import { badRequest, requireUser, unauthorized } from '../../_lib/auth.js';
 import {
   ConnectionRequestError,
@@ -17,6 +18,7 @@ export default async function friendsRequest(req: Request, res: Response) {
 
   try {
     const { userId } = requireUser(req);
+    await assertOnboarded(userId);
     const body = req.body as Record<string, unknown>;
     const message = typeof body.message === 'string' ? body.message : undefined;
     const addresseeIdInput = typeof body.addressee_id === 'string' ? body.addressee_id : '';
@@ -65,6 +67,7 @@ export default async function friendsRequest(req: Request, res: Response) {
       outcome: result.outcome,
     });
   } catch (error) {
+    if (error instanceof OnboardingError) return sendOnboardingError(res, error);
     if (error instanceof ConnectionRequestError) {
       return res.status(error.statusCode).json({
         error: { code: error.code, message: error.message },

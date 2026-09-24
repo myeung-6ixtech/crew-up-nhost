@@ -5,7 +5,8 @@
   "type": "module",
   "dependencies": {
     "@nhost/nhost-js": "^3.3.0",
-    "unpdf": "^1.8.1"
+    "unpdf": "^1.8.1",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

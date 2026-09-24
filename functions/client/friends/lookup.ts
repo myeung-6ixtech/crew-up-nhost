@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { OnboardingError, assertOnboarded, sendOnboardingError } from '../../_lib/onboarding.js';
 import { badRequest, requireUser, unauthorized } from '../../_lib/auth.js';
 import {
   ConnectionRequestError,
@@ -13,7 +14,8 @@ export default async function friendsLookup(req: Request, res: Response) {
   }
 
   try {
-    requireUser(req);
+    const { userId } = requireUser(req);
+    await assertOnboarded(userId);
     const body = req.body as Record<string, unknown>;
     const friendIdInput = typeof body.friend_id === 'string' ? body.friend_id : '';
 
@@ -47,6 +49,7 @@ export default async function friendsLookup(req: Request, res: Response) {
       },
     });
   } catch (error) {
+    if (error instanceof OnboardingError) return sendOnboardingError(res, error);
     if (error instanceof Error && error.message.includes('Authorization')) {
       return unauthorized(res);
     }

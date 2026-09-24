@@ -5,6 +5,18 @@ object_relationships:
   - name: airline
     using:
       foreign_key_constraint_on: airline_id
+  - name: baseAirport
+    using:
+      foreign_key_constraint_on: base_airport_iata
+  - name: onboardingState
+    using:
+      manual_configuration:
+        column_mapping:
+          user_id: user_id
+        insertion_order: null
+        remote_table:
+          name: onboarding_state
+          schema: public
   - name: user
     using:
       foreign_key_constraint_on: user_id
@@ -16,6 +28,14 @@ array_relationships:
         table:
           name: profile_activity_preferences
           schema: public
+computed_fields:
+  - name: own_date_of_birth
+    definition:
+      function:
+        name: profile_own_date_of_birth
+        schema: public
+      session_argument: hasura_session
+    comment: date_of_birth for the caller's own row; null for everyone else
 select_permissions:
   - role: user
     permission:
@@ -33,8 +53,21 @@ select_permissions:
         - is_verified
         - avatar_file_id
         - friend_id
+        - full_name
+        - full_name_native
+        - preferred_name
+        - username
+        - home_country_code
+        - hometown_city
+        - languages
+        - residence_country_code
+        - residence_city
+        - crew_role
+        - base_airport_iata
         - created_at
         - updated_at
+      computed_fields:
+        - own_date_of_birth
       filter:
         _or:
           - user_id:
@@ -44,6 +77,19 @@ select_permissions:
                   _eq: true
               - user_id:
                   _neq: X-Hasura-User-Id
+              - onboardingState:
+                  onboarding_completed_at:
+                    _is_null: false
+              - _exists:
+                  _table:
+                    name: onboarding_state
+                    schema: public
+                  _where:
+                    _and:
+                      - user_id:
+                          _eq: X-Hasura-User-Id
+                      - onboarding_completed_at:
+                          _is_null: false
   - role: staff_admin
     permission:
       columns: '*'
@@ -54,9 +100,13 @@ select_permissions:
       columns:
         - user_id
         - display_name
+        - full_name
+        - username
         - airline_id
         - base_airport
+        - base_airport_iata
         - role_type
+        - crew_role
         - is_verified
       filter: {}
   - role: service

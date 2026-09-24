@@ -20,24 +20,35 @@ select_permissions:
         - visibility
       filter:
         _and:
-          - visibility:
-              _neq: off
-          - user_id:
-              _neq: X-Hasura-User-Id
-          - _or:
+          - _and:
               - visibility:
-                  _eq: all_verified
-              - _and:
+                  _neq: off
+              - user_id:
+                  _neq: X-Hasura-User-Id
+              - _or:
                   - visibility:
-                      _eq: same_airline
-                  - user:
-                      profile:
-                        airline_id:
-                          _eq: X-Hasura-Airline-Id
-                  - user:
-                      profile:
-                        airline_id:
-                          _is_null: false
+                      _eq: all_verified
+                  - _and:
+                      - visibility:
+                          _eq: same_airline
+                      - user:
+                          profile:
+                            airline_id:
+                              _eq: X-Hasura-Airline-Id
+                      - user:
+                          profile:
+                            airline_id:
+                              _is_null: false
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
   - role: staff_admin
     permission:
       columns: '*'

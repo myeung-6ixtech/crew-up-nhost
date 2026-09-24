@@ -35,37 +35,48 @@ select_permissions:
       columns: '*'
       filter:
         _and:
-          - _or:
-              - host_type:
-                  _eq: user
-              - _and:
+          - _and:
+              - _or:
                   - host_type:
-                      _eq: platform
-                  - is_published:
-                      _eq: true
-          - _or:
-              - visibility_scope:
-                  _eq: all_verified
-              - _and:
+                      _eq: user
+                  - _and:
+                      - host_type:
+                          _eq: platform
+                      - is_published:
+                          _eq: true
+              - _or:
                   - visibility_scope:
-                      _eq: same_airline
-                  - creator:
-                      profile:
-                        airline_id:
-                          _eq: X-Hasura-Airline-Id
-                  - creator:
-                      profile:
-                        airline_id:
-                          _is_null: false
-              - creator_id:
-                  _eq: X-Hasura-User-Id
-              - attendees:
-                  user_id:
-                    _eq: X-Hasura-User-Id
-              - thread:
-                  participants:
-                    user_id:
+                      _eq: all_verified
+                  - _and:
+                      - visibility_scope:
+                          _eq: same_airline
+                      - creator:
+                          profile:
+                            airline_id:
+                              _eq: X-Hasura-Airline-Id
+                      - creator:
+                          profile:
+                            airline_id:
+                              _is_null: false
+                  - creator_id:
                       _eq: X-Hasura-User-Id
+                  - attendees:
+                      user_id:
+                        _eq: X-Hasura-User-Id
+                  - thread:
+                      participants:
+                        user_id:
+                          _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
   - role: staff_admin
     permission:
       columns: '*'
@@ -76,21 +87,32 @@ insert_permissions:
     permission:
       check:
         _and:
-          - creator_id:
-              _eq: X-Hasura-User-Id
-          - _or:
-              - visibility_scope:
-                  _neq: same_airline
-              - _exists:
-                  _table:
-                    schema: public
-                    name: profiles
-                  _where:
-                    _and:
-                      - user_id:
-                          _eq: X-Hasura-User-Id
-                      - airline_id:
-                          _is_null: false
+          - _and:
+              - creator_id:
+                  _eq: X-Hasura-User-Id
+              - _or:
+                  - visibility_scope:
+                      _neq: same_airline
+                  - _exists:
+                      _table:
+                        schema: public
+                        name: profiles
+                      _where:
+                        _and:
+                          - user_id:
+                              _eq: X-Hasura-User-Id
+                          - airline_id:
+                              _is_null: false
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       set:
         creator_id: X-Hasura-User-Id
       columns:
@@ -145,10 +167,21 @@ update_permissions:
         - languages
       filter:
         _and:
-          - creator_id:
-              _eq: X-Hasura-User-Id
-          - host_type:
-              _eq: user
+          - _and:
+              - creator_id:
+                  _eq: X-Hasura-User-Id
+              - host_type:
+                  _eq: user
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       check:
         _and:
           - creator_id:
@@ -196,10 +229,21 @@ delete_permissions:
     permission:
       filter:
         _and:
-          - creator_id:
-              _eq: X-Hasura-User-Id
-          - host_type:
-              _eq: user
+          - _and:
+              - creator_id:
+                  _eq: X-Hasura-User-Id
+              - host_type:
+                  _eq: user
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
   - role: staff_admin
     permission:
       filter:

@@ -28,9 +28,20 @@ select_permissions:
     permission:
       columns: '*'
       filter:
-        trip:
-          user_id:
-            _eq: X-Hasura-User-Id
+        _and:
+          - trip:
+              user_id:
+                _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
   - role: service
     permission:
       columns: '*'
@@ -39,9 +50,20 @@ insert_permissions:
   - role: user
     permission:
       check:
-        trip:
-          user_id:
-            _eq: X-Hasura-User-Id
+        _and:
+          - trip:
+              user_id:
+                _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       columns:
         - trip_id
         - city
@@ -61,9 +83,20 @@ update_permissions:
         - starts_at
         - ends_at
       filter:
-        trip:
-          user_id:
-            _eq: X-Hasura-User-Id
+        _and:
+          - trip:
+              user_id:
+                _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       check:
         trip:
           user_id:
@@ -77,9 +110,20 @@ delete_permissions:
   - role: user
     permission:
       filter:
-        trip:
-          user_id:
-            _eq: X-Hasura-User-Id
+        _and:
+          - trip:
+              user_id:
+                _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
   - role: service
     permission:
       filter: {}

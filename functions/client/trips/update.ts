@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { OnboardingError, assertOnboarded, sendOnboardingError } from '../../_lib/onboarding.js';
 import { badRequest, requireUser, unauthorized } from '../../_lib/auth.js';
 import { graphqlRaw } from '../../_lib/graphql.js';
 import { recomputeTripMatches } from '../../_lib/tripMatching.js';
@@ -18,6 +19,7 @@ export default async function updateTrip(req: Request, res: Response) {
 
   try {
     const { userId } = requireUser(req);
+    await assertOnboarded(userId);
     const body = req.body as Record<string, unknown>;
     const tripId = typeof body.trip_id === 'string' ? body.trip_id : '';
     if (!tripId) return badRequest(res, 'trip_id is required');
@@ -129,6 +131,7 @@ export default async function updateTrip(req: Request, res: Response) {
       match_status: 'pending',
     });
   } catch (error) {
+    if (error instanceof OnboardingError) return sendOnboardingError(res, error);
     if (error instanceof Error && error.message.includes('Authorization')) {
       return unauthorized(res);
     }

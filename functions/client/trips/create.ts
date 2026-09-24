@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { OnboardingError, assertOnboarded, sendOnboardingError } from '../../_lib/onboarding.js';
 import {
   badRequest,
   requireUser,
@@ -194,6 +195,7 @@ export default async function createTrip(req: Request, res: Response) {
 
   try {
     const { userId } = requireUser(req);
+    await assertOnboarded(userId);
     const body = req.body as Record<string, unknown>;
     const title = typeof body.title === 'string' ? body.title.trim() : null;
     const source =
@@ -315,6 +317,7 @@ export default async function createTrip(req: Request, res: Response) {
       match_status: 'pending',
     });
   } catch (error) {
+    if (error instanceof OnboardingError) return sendOnboardingError(res, error);
     if (error instanceof Error && error.message.includes('Authorization')) {
       return unauthorized(res);
     }

@@ -36,6 +36,11 @@ value = '{{ secrets.ROSTER_LLM_MODEL }}'
 name = 'ROSTER_LLM_ALLOW_RAW_FILES'
 value = '{{ secrets.ROSTER_LLM_ALLOW_RAW_FILES }}'
 
+# Onboarding mode (documentation/features/onboarding.md §2). Read only by functions/_lib/appMode.ts.
+[[global.environment]]
+name = 'CREWUP_APP_MODE'
+value = '{{ secrets.CREWUP_APP_MODE }}'
+
 [hasura]
 version = 'v2.48.10-ce'
 adminSecret = '{{ secrets.HASURA_GRAPHQL_ADMIN_SECRET }}'

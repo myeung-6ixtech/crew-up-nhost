@@ -13,12 +13,23 @@ select_permissions:
     permission:
       columns: '*'
       filter:
-        _or:
-          - user_id:
-              _eq: X-Hasura-User-Id
-          - event:
-              creator_id:
-                _eq: X-Hasura-User-Id
+        _and:
+          - _or:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - event:
+                  creator_id:
+                    _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
   - role: staff_admin
     permission:
       columns: '*'
@@ -29,17 +40,28 @@ insert_permissions:
     permission:
       check:
         _and:
-          - user_id:
-              _eq: X-Hasura-User-Id
-          - event:
-              _or:
-                - host_type:
-                    _eq: user
-                - _and:
+          - _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - event:
+                  _or:
                     - host_type:
-                        _eq: platform
-                    - is_published:
-                        _eq: true
+                        _eq: user
+                    - _and:
+                        - host_type:
+                            _eq: platform
+                        - is_published:
+                            _eq: true
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       set:
         user_id: X-Hasura-User-Id
       columns:
@@ -51,8 +73,19 @@ update_permissions:
       columns:
         - status
       filter:
-        user_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - user_id:
+              _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
       check:
         user_id:
           _eq: X-Hasura-User-Id
@@ -60,5 +93,16 @@ delete_permissions:
   - role: user
     permission:
       filter:
-        user_id:
-          _eq: X-Hasura-User-Id
+        _and:
+          - user_id:
+              _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
