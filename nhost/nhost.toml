@@ -79,9 +79,19 @@ version = '0.49.1'
 [auth.elevatedPrivileges]
 mode = 'disabled'
 
+# clientUrl is the fallback when redirectTo is missing or not allowed.
+# The simulator's Google return URL is Metro (port 8081). Without it, Nhost
+# sends the browser to clientUrl and the login sheet never closes.
 [auth.redirections]
 clientUrl = 'http://localhost:3000'
-allowedUrls = ['crewup://', 'exp://', 'http://localhost:3000', 'https://admin.crewup.app']
+allowedUrls = [
+  'crewup://',
+  'exp://',
+  'http://localhost:8081',
+  'http://127.0.0.1:8081',
+  'http://localhost:3000',
+  'https://admin.crewup.app',
+]
 
 [auth.signUp]
 enabled = true
