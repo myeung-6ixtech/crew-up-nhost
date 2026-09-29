@@ -78,10 +78,15 @@ export const NameHandleSchema = z.object({
   username: UsernameSchema,
 });
 
+const Coordinate = (min: number, max: number) => z.number().min(min).max(max).nullish();
+
 export const AboutSchema = z.object({
   dateOfBirth: DateOfBirthSchema,
   homeCountryCode: CountryCodeSchema,
   hometownCity: optionalText(100),
+  /** Private. Set only when the hometown was chosen from search. */
+  hometownLatitude: Coordinate(-90, 90),
+  hometownLongitude: Coordinate(-180, 180),
   languages: z
     .array(z.string().refine((code) => LANGUAGE_CODES.has(code), 'Unsupported language'))
     .min(1, 'Choose at least one language')

@@ -39,6 +39,10 @@ select_permissions:
     permission:
       columns: '*'
       filter: {}
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 insert_permissions:
   - role: staff_admin
     permission:

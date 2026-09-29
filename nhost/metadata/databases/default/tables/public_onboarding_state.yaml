@@ -30,6 +30,11 @@ select_permissions:
     permission:
       columns: '*'
       filter: {}
+insert_permissions:
+  - role: service
+    permission:
+      check: {}
+      columns: '*'
 update_permissions:
   - role: user
     permission:
@@ -41,3 +46,8 @@ update_permissions:
       check:
         user_id:
           _eq: X-Hasura-User-Id
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+      check: {}

@@ -151,12 +151,22 @@ export function columnsForStep(step: OnboardingStep, data: Record<string, unknow
       };
     }
     case 'about': {
-      const d = data as { dateOfBirth: string; homeCountryCode: string; hometownCity: string | null; languages: string[] };
+      const d = data as {
+        dateOfBirth: string;
+        homeCountryCode: string;
+        hometownCity: string | null;
+        hometownLatitude?: number | null;
+        hometownLongitude?: number | null;
+        languages: string[];
+      };
+      const hasPlace = Boolean(d.hometownCity) && d.hometownLatitude != null && d.hometownLongitude != null;
       return {
         profile: {
           date_of_birth: d.dateOfBirth,
           home_country_code: d.homeCountryCode,
           hometown_city: d.hometownCity,
+          hometown_latitude: hasPlace ? d.hometownLatitude : null,
+          hometown_longitude: hasPlace ? d.hometownLongitude : null,
           languages: d.languages,
         },
         userPrivate: null,
