@@ -17,9 +17,7 @@ select_permissions:
   - role: user
     permission:
       columns: '*'
-      filter:
-        user_id:
-          _eq: X-Hasura-User-Id
+      filter: {}
   - role: staff_admin
     permission:
       columns: '*'
