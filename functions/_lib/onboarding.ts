@@ -138,39 +138,46 @@ export type StepWrite = {
 export function columnsForStep(step: OnboardingStep, data: Record<string, unknown>): StepWrite {
   switch (step) {
     case 'name_handle': {
-      const d = data as { fullName: string; fullNameNative: string | null; preferredName: string | null; username: string };
-      return {
-        profile: {
-          full_name: d.fullName,
-          full_name_native: d.fullNameNative,
-          preferred_name: d.preferredName,
-          username: d.username,
-          display_name: d.preferredName ?? d.fullName,
-        },
-        userPrivate: null,
+      const d = data as {
+        fullName?: string;
+        fullNameNative?: string | null;
+        preferredName?: string | null;
+        username?: string;
       };
+      const profile: Record<string, unknown> = {};
+      if (d.fullName !== undefined) profile.full_name = d.fullName;
+      if (d.fullNameNative !== undefined) profile.full_name_native = d.fullNameNative;
+      if (d.preferredName !== undefined) profile.preferred_name = d.preferredName;
+      if (d.username !== undefined) profile.username = d.username;
+      // A name edit omits preferredName so the chosen display name stays.
+      // Setting preferredName (including null, alongside fullName) still updates it.
+      if (d.preferredName !== undefined && (d.preferredName || d.fullName)) {
+        profile.display_name = d.preferredName ?? d.fullName;
+      }
+      return { profile: Object.keys(profile).length ? profile : null, userPrivate: null };
     }
     case 'about': {
       const d = data as {
-        dateOfBirth: string;
-        homeCountryCode: string;
-        hometownCity: string | null;
+        dateOfBirth?: string;
+        homeCountryCode?: string;
+        hometownCity?: string | null;
         hometownLatitude?: number | null;
         hometownLongitude?: number | null;
-        languages: string[];
+        languages?: string[];
       };
-      const hasPlace = Boolean(d.hometownCity) && d.hometownLatitude != null && d.hometownLongitude != null;
-      return {
-        profile: {
-          date_of_birth: d.dateOfBirth,
-          home_country_code: d.homeCountryCode,
-          hometown_city: d.hometownCity,
-          hometown_latitude: hasPlace ? d.hometownLatitude : null,
-          hometown_longitude: hasPlace ? d.hometownLongitude : null,
-          languages: d.languages,
-        },
-        userPrivate: null,
-      };
+      const profile: Record<string, unknown> = {};
+      if (d.dateOfBirth !== undefined) profile.date_of_birth = d.dateOfBirth;
+      if (d.homeCountryCode !== undefined) profile.home_country_code = d.homeCountryCode;
+      if (d.languages !== undefined) profile.languages = d.languages;
+      const touchesPlace =
+        d.hometownCity !== undefined || d.hometownLatitude !== undefined || d.hometownLongitude !== undefined;
+      if (d.hometownCity !== undefined) profile.hometown_city = d.hometownCity;
+      if (touchesPlace) {
+        const hasPlace = Boolean(d.hometownCity) && d.hometownLatitude != null && d.hometownLongitude != null;
+        profile.hometown_latitude = hasPlace ? d.hometownLatitude : null;
+        profile.hometown_longitude = hasPlace ? d.hometownLongitude : null;
+      }
+      return { profile: Object.keys(profile).length ? profile : null, userPrivate: null };
     }
     case 'residence': {
       const d = data as { residenceCountryCode: string; residenceCity: string };

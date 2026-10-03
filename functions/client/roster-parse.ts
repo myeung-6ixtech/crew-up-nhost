@@ -66,10 +66,7 @@ async function modelInput(
   }
 
   if (IMAGE_MIME_TYPES.has(mimeType)) {
-    if (allowRawFiles) {
-      return { input: { kind: 'file', mimeType, bytes }, pages: null, redactedLines: 0 };
-    }
-    throw new RosterImportError('ROSTER_TEXT_UNAVAILABLE', 'Image rosters need raw file mode');
+    return { input: { kind: 'file', mimeType, bytes }, pages: null, redactedLines: 0 };
   }
 
   throw new RosterImportError('ROSTER_FILE_UNSUPPORTED', `Unsupported type ${mimeType}`, 415);
@@ -115,7 +112,7 @@ export default async function rosterParse(req: Request, res: Response) {
       throw new RosterImportError('ROSTER_PARSER_UNAVAILABLE', 'Roster LLM is not configured', 503);
     }
 
-    const mimeType = (file.mime_type ?? '').toLowerCase();
+    const mimeType = (file.mime_type ?? '').toLowerCase().replace('image/jpg', 'image/jpeg');
     if (mimeType !== 'application/pdf' && !IMAGE_MIME_TYPES.has(mimeType)) {
       throw new RosterImportError('ROSTER_FILE_UNSUPPORTED', `Unsupported type ${mimeType}`, 415);
     }

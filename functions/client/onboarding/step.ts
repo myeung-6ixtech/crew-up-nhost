@@ -45,7 +45,7 @@ export default async function onboardingStep(req: Request, res: Response) {
 
     const data = parseStepData(step, request.data.data);
 
-    if (step === 'name_handle' && (await isUsernameTaken(String(data.username), userId))) {
+    if (step === 'name_handle' && typeof data.username === 'string' && (await isUsernameTaken(data.username, userId))) {
       throw new OnboardingError(409, 'ONBOARDING_USERNAME_TAKEN', 'That username is taken', {
         username: 'That username is taken',
       });

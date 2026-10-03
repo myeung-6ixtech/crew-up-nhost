@@ -119,6 +119,30 @@ test('step writes keep legacy columns in sync', () => {
     lib.columnsForStep('name_handle', { fullName: 'Chan Tai Man', fullNameNative: null, preferredName: 'Man', username: 'taiman' }).profile.display_name,
     'Man',
   );
+  assert.deepEqual(lib.columnsForStep('name_handle', { fullName: 'Chan Tai Man', username: 'taiman' }).profile, {
+    full_name: 'Chan Tai Man',
+    username: 'taiman',
+  });
+  assert.deepEqual(lib.columnsForStep('name_handle', { preferredName: 'Man' }).profile, {
+    preferred_name: 'Man',
+    display_name: 'Man',
+  });
+  assert.deepEqual(lib.columnsForStep('about', { languages: ['en'] }).profile, { languages: ['en'] });
+  assert.deepEqual(lib.columnsForStep('about', { dateOfBirth: '1995-04-02' }).profile, { date_of_birth: '1995-04-02' });
+  assert.deepEqual(
+    lib.columnsForStep('about', {
+      homeCountryCode: 'HK',
+      hometownCity: 'Hong Kong',
+      hometownLatitude: 22.3,
+      hometownLongitude: 114.2,
+    }).profile,
+    {
+      home_country_code: 'HK',
+      hometown_city: 'Hong Kong',
+      hometown_latitude: 22.3,
+      hometown_longitude: 114.2,
+    },
+  );
   const crew = lib.columnsForStep('crew', { crewRole: 'other', airlineId: AIRLINE_ID, baseAirportIata: 'HKG' }).profile;
   assert.equal(crew.role_type, null);
   assert.equal(crew.base_airport, 'HKG');
@@ -271,6 +295,39 @@ test('step save for a completed user (Edit profile) never touches onboarding_sta
   );
   assert.equal(res.statusCode, 200);
   assert.ok(!calls.some((call) => call.name === 'SetCurrentStep'));
+});
+
+test('about and name patches validate only the fields that were sent', () => {
+  assert.equal(shared.AboutSchema.safeParse({ languages: ['en'] }).success, false);
+  assert.equal(shared.AboutPatchSchema.safeParse({ languages: ['en'] }).success, true);
+  assert.equal(shared.AboutPatchSchema.safeParse({}).success, false);
+  assert.equal(shared.NameHandleSchema.safeParse({ preferredName: 'Man' }).success, false);
+  assert.equal(shared.NameHandlePatchSchema.safeParse({ preferredName: 'Man' }).success, true);
+  const languagesOnly = shared.AboutPatchSchema.parse({ languages: ['en'] });
+  assert.deepEqual(languagesOnly, { languages: ['en'] });
+});
+
+test('step about accepts a languages-only patch and does not write the other columns', async () => {
+  process.env.CREWUP_APP_MODE = 'launched';
+  const calls = mockGraphql({
+    EnsureOnboardingState: () => ({
+      insert_onboarding_state_one: { ...baseState, current_step: 'about', onboarding_completed_at: '2026-09-01T00:00:00+00:00' },
+    }),
+    UpsertProfile: () => ({ insert_profiles_one: { user_id: USER_ID } }),
+  });
+  const res = mockRes();
+  await stepHandler(
+    {
+      method: 'PUT',
+      headers: { authorization: tokenFor(USER_ID) },
+      body: { step: 'about', data: { languages: ['en'] }, advance: false },
+    },
+    res,
+  );
+  assert.equal(res.statusCode, 200, JSON.stringify(res.body));
+  const upsert = calls.find((call) => call.name === 'UpsertProfile');
+  assert.deepEqual(upsert.variables.row, { user_id: USER_ID, languages: ['en'] });
+  assert.deepEqual(upsert.variables.columns, ['languages']);
 });
 
 test('invalid step data returns field errors', async () => {

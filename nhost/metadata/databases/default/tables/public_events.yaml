@@ -165,6 +165,8 @@ update_permissions:
         - visibility_scope
         - tags
         - languages
+        - rsvp_closed_at
+        - cancelled_at
       filter:
         _and:
           - _and:

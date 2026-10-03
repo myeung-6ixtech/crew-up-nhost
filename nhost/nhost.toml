@@ -36,6 +36,11 @@ value = '{{ secrets.ROSTER_LLM_MODEL }}'
 name = 'ROSTER_LLM_ALLOW_RAW_FILES'
 value = '{{ secrets.ROSTER_LLM_ALLOW_RAW_FILES }}'
 
+# Venue search for meets. Places API (New); the key never ships in the app.
+[[global.environment]]
+name = 'GOOGLE_PLACES_API_KEY'
+value = '{{ secrets.GOOGLE_PLACES_API_KEY }}'
+
 # Onboarding mode (documentation/features/onboarding.md §2). Read only by functions/_lib/appMode.ts.
 [[global.environment]]
 name = 'CREWUP_APP_MODE'

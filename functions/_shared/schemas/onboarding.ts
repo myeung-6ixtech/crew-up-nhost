@@ -132,9 +132,19 @@ export const ProfileCompleteSchema = z.object({
   ...CrewIdentitySchema.shape,
 });
 
+/** Step saves may send only the fields on that screen. Completeness stays on `ProfileCompleteSchema`. */
+function fieldsPresent<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
+  return schema.partial().refine((value) => Object.values(value).some((item) => item !== undefined), {
+    message: 'Nothing to save',
+  });
+}
+
+export const NameHandlePatchSchema = fieldsPresent(NameHandleSchema);
+export const AboutPatchSchema = fieldsPresent(AboutSchema);
+
 export const STEP_SCHEMAS = {
-  name_handle: NameHandleSchema,
-  about: AboutSchema,
+  name_handle: NameHandlePatchSchema,
+  about: AboutPatchSchema,
   residence: ResidenceSchema,
   crew: CrewIdentitySchema,
   phone: PhoneSchema,

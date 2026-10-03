@@ -72,10 +72,22 @@ update_permissions:
     permission:
       columns:
         - status
+      # Attendees change their own RSVP (unless the host removed them).
+      # The host of a member meet can mark someone removed.
       filter:
         _and:
-          - user_id:
-              _eq: X-Hasura-User-Id
+          - _or:
+              - _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - status:
+                      _neq: removed
+              - event:
+                  _and:
+                    - creator_id:
+                        _eq: X-Hasura-User-Id
+                    - host_type:
+                        _eq: user
           - _exists:
               _table:
                 name: onboarding_state
@@ -87,8 +99,18 @@ update_permissions:
                   - onboarding_completed_at:
                       _is_null: false
       check:
-        user_id:
-          _eq: X-Hasura-User-Id
+        _or:
+          - _and:
+              - user_id:
+                  _eq: X-Hasura-User-Id
+              - status:
+                  _neq: removed
+          - _and:
+              - status:
+                  _eq: removed
+              - event:
+                  creator_id:
+                    _eq: X-Hasura-User-Id
 delete_permissions:
   - role: user
     permission:
