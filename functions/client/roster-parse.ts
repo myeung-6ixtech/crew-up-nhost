@@ -15,11 +15,11 @@ interface ActionPayload {
 }
 
 interface StorageFileRow {
-  files_by_pk: {
+  file: {
     id: string;
-    bucket_id: string;
+    bucketId: string;
     name: string;
-    mime_type: string | null;
+    mimeType: string | null;
   } | null;
 }
 
@@ -86,11 +86,11 @@ export default async function rosterParse(req: Request, res: Response) {
     const data = await graphqlAsUser<StorageFileRow>(
       `
         query GetFile($id: uuid!) {
-          files_by_pk(id: $id) {
+          file(id: $id) {
             id
-            bucket_id
+            bucketId
             name
-            mime_type
+            mimeType
           }
         }
       `,
@@ -98,12 +98,12 @@ export default async function rosterParse(req: Request, res: Response) {
       { id: fileId },
     );
 
-    const file = data.files_by_pk;
+    const file = data.file;
     if (!file) {
       return res.status(404).json({ message: 'File not found or not accessible' });
     }
 
-    if (file.bucket_id !== 'rosters') {
+    if (file.bucketId !== 'rosters') {
       return badRequest(res, 'File must be uploaded to the rosters bucket');
     }
 
@@ -112,7 +112,7 @@ export default async function rosterParse(req: Request, res: Response) {
       throw new RosterImportError('ROSTER_PARSER_UNAVAILABLE', 'Roster LLM is not configured', 503);
     }
 
-    const mimeType = (file.mime_type ?? '').toLowerCase().replace('image/jpg', 'image/jpeg');
+    const mimeType = (file.mimeType ?? '').toLowerCase().replace('image/jpg', 'image/jpeg');
     if (mimeType !== 'application/pdf' && !IMAGE_MIME_TYPES.has(mimeType)) {
       throw new RosterImportError('ROSTER_FILE_UNSUPPORTED', `Unsupported type ${mimeType}`, 415);
     }

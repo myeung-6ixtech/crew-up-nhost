@@ -1,0 +1,1 @@
+-- Leave seeded airlines in place. Profiles may already reference them.
