@@ -36,6 +36,14 @@ value = '{{ secrets.ROSTER_LLM_MODEL }}'
 name = 'ROSTER_LLM_ALLOW_RAW_FILES'
 value = '{{ secrets.ROSTER_LLM_ALLOW_RAW_FILES }}'
 
+[[global.environment]]
+name = 'OPENROUTER_API_KEY'
+value = '{{ secrets.OPENROUTER_API_KEY }}'
+
+[[global.environment]]
+name = 'ROSTER_LLM_MODELS'
+value = '{{ secrets.ROSTER_LLM_MODELS }}'
+
 # Venue search for meets. Places API (New); the key never ships in the app.
 [[global.environment]]
 name = 'GOOGLE_PLACES_API_KEY'

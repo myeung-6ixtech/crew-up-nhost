@@ -183,3 +183,59 @@ test('gemini failures map to roster error codes', async (t) => {
   process.env.GEMINI_API_KEY = '';
   await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), { code: 'ROSTER_PARSER_UNAVAILABLE' });
 });
+
+test('openrouter sends the model list and parses the reply', async (t) => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODELS = 'writer/free-text:free, vision/free-photo:free';
+  let request;
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    request = { url, init, body: JSON.parse(init.body) };
+    return new Response(
+      JSON.stringify({
+        model: 'writer/free-text:free',
+        choices: [{ message: { content: JSON.stringify({ home_base: 'SIN', duties: [leg({})], warnings: [] }) } }],
+        usage: { prompt_tokens: 800, completion_tokens: 200 },
+      }),
+      { status: 200 },
+    );
+  });
+
+  const result = await extractRosterDuties({ kind: 'text', text: '03OCT SQ322 SIN 2330 LHR 0615' });
+
+  assert.equal(request.url, 'https://openrouter.ai/api/v1/chat/completions');
+  assert.equal(request.init.headers.authorization, 'Bearer or-test');
+  assert.deepEqual(request.body.models, ['writer/free-text:free', 'vision/free-photo:free']);
+  assert.equal(request.body.provider.data_collection, 'deny');
+  assert.equal(request.body.messages[1].content.startsWith('--- ROSTER TEXT ---'), true);
+  assert.equal(result.model, 'writer/free-text:free');
+  assert.equal(result.extraction.duties[0].flight_number, 'SQ322');
+  assert.equal(result.inputTokens, 800);
+});
+
+test('openrouter tries the next model once when the first reply is not a roster', async (t) => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODELS = 'first:free, second:free';
+  const bodies = [];
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    bodies.push(JSON.parse(init.body));
+    calls += 1;
+    const content = calls === 1 ? 'not json' : JSON.stringify({ home_base: null, duties: [leg({})], warnings: [] });
+    return new Response(JSON.stringify({ model: 'second:free', choices: [{ message: { content } }] }), { status: 200 });
+  });
+
+  const result = await extractRosterDuties({ kind: 'text', text: 'x' });
+  assert.equal(calls, 2);
+  assert.deepEqual(bodies[1].models, ['second:free']);
+  assert.equal(result.extraction.duties[0].flight_number, 'SQ322');
+});
+
+test('openrouter payment refusal is a forwarded roster error', async (t) => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODELS = 'first:free';
+  t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 402 }));
+  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), { code: 'ROSTER_PARSER_UNAVAILABLE', statusCode: 422 });
+});
