@@ -9,6 +9,7 @@ interface TripContext {
   id: string;
   userId: string;
   visibility: string;
+  isActive: boolean;
   airlineId: string | null;
   isVerified: boolean;
   legFlightIds: string[];
@@ -36,73 +37,34 @@ interface CandidateTrip {
   isVerified: boolean;
 }
 
-async function loadTripContext(tripId: string): Promise<TripContext | null> {
-  const data = await graphqlRaw<{
-    user_trips_by_pk: {
+type TripRow = {
+  id: string;
+  user_id: string;
+  visibility: string | null;
+  is_active: boolean;
+  user: {
+    profile: { airline_id: string | null; is_verified: boolean; default_visibility: string } | null;
+  } | null;
+  flightLegs: Array<{
+    flight_instance_id: string;
+    flight: {
       id: string;
-      user_id: string;
-      visibility: string | null;
-      user: {
-        profile: { airline_id: string | null; is_verified: boolean; default_visibility: string } | null;
-      } | null;
-      flightLegs: Array<{
-        flight_instance_id: string;
-        flight: {
-          id: string;
-          flight_number: string;
-          departure_airport: string;
-          arrival_airport: string;
-          scheduled_departure: string;
-        };
-      }>;
-      stays: Array<{
-        id: string;
-        city: string;
-        airport_iata: string | null;
-        starts_at: string;
-        ends_at: string;
-      }>;
-    } | null;
-  }>(
-    `
-      query TripContext($tripId: uuid!) {
-        user_trips_by_pk(id: $tripId) {
-          id
-          user_id
-          visibility
-          user {
-            profile {
-              airline_id
-              is_verified
-              default_visibility
-            }
-          }
-          flightLegs {
-            flight_instance_id
-            flight {
-              id
-              flight_number
-              departure_airport
-              arrival_airport
-              scheduled_departure
-            }
-          }
-          stays {
-            id
-            city
-            airport_iata
-            starts_at
-            ends_at
-          }
-        }
-      }
-    `,
-    { tripId },
-  );
+      flight_number: string;
+      departure_airport: string;
+      arrival_airport: string;
+      scheduled_departure: string;
+    };
+  }>;
+  stays: Array<{
+    id: string;
+    city: string;
+    airport_iata: string | null;
+    starts_at: string;
+    ends_at: string;
+  }>;
+};
 
-  const trip = data.user_trips_by_pk;
-  if (!trip) return null;
-
+function toTripContext(trip: TripRow): TripContext {
   const profile = trip.user?.profile;
   const effectiveVisibility = normalizeVisibilityForAffiliation(
     trip.visibility ?? profile?.default_visibility ?? 'friends',
@@ -113,6 +75,7 @@ async function loadTripContext(tripId: string): Promise<TripContext | null> {
     id: trip.id,
     userId: trip.user_id,
     visibility: effectiveVisibility,
+    isActive: trip.is_active,
     airlineId: profile?.airline_id ?? null,
     isVerified: profile?.is_verified ?? false,
     legFlightIds: trip.flightLegs.map((leg) => leg.flight_instance_id),
@@ -133,18 +96,79 @@ async function loadTripContext(tripId: string): Promise<TripContext | null> {
   };
 }
 
-async function loadFriendIds(userId: string): Promise<Set<string>> {
+const TRIP_CONTEXT_FIELDS = `
+  id
+  user_id
+  visibility
+  is_active
+  user {
+    profile {
+      airline_id
+      is_verified
+      default_visibility
+    }
+  }
+  flightLegs {
+    flight_instance_id
+    flight {
+      id
+      flight_number
+      departure_airport
+      arrival_airport
+      scheduled_departure
+    }
+  }
+  stays {
+    id
+    city
+    airport_iata
+    starts_at
+    ends_at
+  }
+`;
+
+async function loadTripContexts(tripIds: string[]): Promise<Map<string, TripContext>> {
+  const trips = new Map<string, TripContext>();
+  if (!tripIds.length) return trips;
+
+  const data = await graphqlRaw<{ user_trips: TripRow[] }>(
+    `
+      query TripContexts($ids: [uuid!]!) {
+        user_trips(where: { id: { _in: $ids } }) {
+          ${TRIP_CONTEXT_FIELDS}
+        }
+      }
+    `,
+    { ids: tripIds },
+  );
+
+  for (const trip of data.user_trips) {
+    trips.set(trip.id, toTripContext(trip));
+  }
+  return trips;
+}
+
+async function loadTripContext(tripId: string): Promise<TripContext | null> {
+  const trips = await loadTripContexts([tripId]);
+  return trips.get(tripId) ?? null;
+}
+
+async function loadFriendMap(userIds: string[]): Promise<Map<string, Set<string>>> {
+  const friends = new Map<string, Set<string>>();
+  for (const userId of userIds) friends.set(userId, new Set());
+  if (!userIds.length) return friends;
+
   const data = await graphqlRaw<{
     connections: Array<{ requester_id: string; addressee_id: string }>;
   }>(
     `
-      query FriendIds($userId: uuid!) {
+      query FriendIds($userIds: [uuid!]!) {
         connections(
           where: {
             status: { _eq: accepted }
             _or: [
-              { requester_id: { _eq: $userId } }
-              { addressee_id: { _eq: $userId } }
+              { requester_id: { _in: $userIds } }
+              { addressee_id: { _in: $userIds } }
             ]
           }
         ) {
@@ -153,14 +177,14 @@ async function loadFriendIds(userId: string): Promise<Set<string>> {
         }
       }
     `,
-    { userId },
+    { userIds },
   );
 
-  const ids = new Set<string>();
   for (const row of data.connections) {
-    ids.add(row.requester_id === userId ? row.addressee_id : row.requester_id);
+    friends.get(row.requester_id)?.add(row.addressee_id);
+    friends.get(row.addressee_id)?.add(row.requester_id);
   }
-  return ids;
+  return friends;
 }
 
 async function loadBlockedUserIds(userId: string): Promise<Set<string>> {
@@ -245,7 +269,22 @@ async function clearMatchesForTrip(tripId: string): Promise<number> {
   return result.delete_trip_matches.affected_rows;
 }
 
-async function insertMatch(input: {
+type MatchInsert = {
+  user_id: string;
+  matched_user_id: string;
+  match_type: MatchType;
+  score: number;
+  source_trip_id: string;
+  matched_trip_id: string;
+  city: string | null;
+  flight_number: string | null;
+  departure_airport: string | null;
+  arrival_airport: string | null;
+  overlap_start: string | null;
+  overlap_end: string | null;
+};
+
+function matchRow(input: {
   userId: string;
   matchedUserId: string;
   matchType: MatchType;
@@ -258,38 +297,42 @@ async function insertMatch(input: {
   arrivalAirport?: string | null;
   overlapStart?: string | null;
   overlapEnd?: string | null;
-}) {
+}): MatchInsert {
+  return {
+    user_id: input.userId,
+    matched_user_id: input.matchedUserId,
+    match_type: input.matchType,
+    score: input.score,
+    source_trip_id: input.sourceTripId,
+    matched_trip_id: input.matchedTripId,
+    city: input.city ?? null,
+    flight_number: input.flightNumber ?? null,
+    departure_airport: input.departureAirport ?? null,
+    arrival_airport: input.arrivalAirport ?? null,
+    overlap_start: input.overlapStart ?? null,
+    overlap_end: input.overlapEnd ?? null,
+  };
+}
+
+async function insertMatches(objects: MatchInsert[]): Promise<number> {
+  if (!objects.length) return 0;
   await graphqlRaw(
     `
-      mutation InsertTripMatch($object: trip_matches_insert_input!) {
-        insert_trip_matches_one(
-          object: $object
+      mutation InsertTripMatches($objects: [trip_matches_insert_input!]!) {
+        insert_trip_matches(
+          objects: $objects
           on_conflict: {
             constraint: trip_matches_unique
             update_columns: [score, city, flight_number, departure_airport, arrival_airport, overlap_start, overlap_end, updated_at]
           }
         ) {
-          id
+          affected_rows
         }
       }
     `,
-    {
-      object: {
-        user_id: input.userId,
-        matched_user_id: input.matchedUserId,
-        match_type: input.matchType,
-        score: input.score,
-        source_trip_id: input.sourceTripId,
-        matched_trip_id: input.matchedTripId,
-        city: input.city ?? null,
-        flight_number: input.flightNumber ?? null,
-        departure_airport: input.departureAirport ?? null,
-        arrival_airport: input.arrivalAirport ?? null,
-        overlap_start: input.overlapStart ?? null,
-        overlap_end: input.overlapEnd ?? null,
-      },
-    },
+    { objects },
   );
+  return objects.length;
 }
 
 export async function recomputeTripMatches(tripId: string): Promise<{
@@ -297,7 +340,7 @@ export async function recomputeTripMatches(tripId: string): Promise<{
   insertedMatches: number;
 }> {
   const source = await loadTripContext(tripId);
-  if (!source || source.visibility === 'off') {
+  if (!source || source.visibility === 'off' || !source.isActive) {
     const deleted = await clearMatchesForTrip(tripId);
     return { deletedMatches: deleted, insertedMatches: 0 };
   }
@@ -307,14 +350,12 @@ export async function recomputeTripMatches(tripId: string): Promise<{
     return { deletedMatches, insertedMatches: 0 };
   }
 
-  const sourceFriends = await loadFriendIds(source.userId);
   const sourceBlocks = await loadBlockedUserIds(source.userId);
-
   const candidateTripIds = new Set<string>();
 
   if (source.legFlightIds.length) {
     const sameFlight = await graphqlRaw<{
-      trip_flight_legs: Array<{ trip_id: string; trip: { id: string; user_id: string } }>;
+      trip_flight_legs: Array<{ trip_id: string }>;
     }>(
       `
         query SameFlightCandidates($flightIds: [uuid!]!, $tripId: uuid!) {
@@ -326,7 +367,6 @@ export async function recomputeTripMatches(tripId: string): Promise<{
             }
           ) {
             trip_id
-            trip { id user_id }
           }
         }
       `,
@@ -336,47 +376,44 @@ export async function recomputeTripMatches(tripId: string): Promise<{
   }
 
   if (source.stays.length) {
-    for (const stay of source.stays) {
-      const overlap = await graphqlRaw<{
-        trip_stays: Array<{ trip_id: string }>;
-      }>(
-        `
-          query OverlapStays($city: String!, $startsAt: timestamptz!, $endsAt: timestamptz!, $tripId: uuid!) {
-            trip_stays(
-              where: {
-                trip_id: { _neq: $tripId }
-                city: { _ilike: $city }
-                starts_at: { _lte: $endsAt }
-                ends_at: { _gte: $startsAt }
-                trip: { is_active: { _eq: true } }
-              }
-            ) {
-              trip_id
+    const overlap = await graphqlRaw<{ trip_stays: Array<{ trip_id: string }> }>(
+      `
+        query OverlapStays($tripId: uuid!, $windows: [trip_stays_bool_exp!]!) {
+          trip_stays(
+            where: {
+              trip_id: { _neq: $tripId }
+              trip: { is_active: { _eq: true } }
+              _or: $windows
             }
+          ) {
+            trip_id
           }
-        `,
-        {
-          city: stay.city,
-          startsAt: stay.startsAt,
-          endsAt: stay.endsAt,
-          tripId: source.id,
-        },
-      );
-      for (const row of overlap.trip_stays) candidateTripIds.add(row.trip_id);
-    }
+        }
+      `,
+      {
+        tripId: source.id,
+        windows: source.stays.map((stay) => ({
+          city: { _ilike: stay.city },
+          starts_at: { _lte: stay.endsAt },
+          ends_at: { _gte: stay.startsAt },
+        })),
+      },
+    );
+    for (const row of overlap.trip_stays) candidateTripIds.add(row.trip_id);
   }
 
-  let insertedMatches = 0;
+  const targets = await loadTripContexts([...candidateTripIds]);
+  const comparable = [...targets.values()].filter(
+    (target) => target.userId !== source.userId && target.isActive && !sourceBlocks.has(target.userId),
+  );
+  const friendMap = await loadFriendMap([source.userId, ...comparable.map((target) => target.userId)]);
+  const sourceFriends = friendMap.get(source.userId) ?? new Set<string>();
+  const rows: MatchInsert[] = [];
 
-  for (const candidateTripId of candidateTripIds) {
-    const target = await loadTripContext(candidateTripId);
-    if (!target || target.userId === source.userId) continue;
-    if (sourceBlocks.has(target.userId)) continue;
-
-    const targetFriends = await loadFriendIds(target.userId);
+  for (const target of comparable) {
+    const targetFriends = friendMap.get(target.userId) ?? new Set<string>();
     if (!canDiscover(source, target, sourceFriends, targetFriends)) continue;
 
-    const pairKey = `${source.userId}:${target.userId}`;
     const matchesForPair: Array<{
       matchType: MatchType;
       score: number;
@@ -451,42 +488,36 @@ export async function recomputeTripMatches(tripId: string): Promise<{
       }
     }
 
-    if (!matchesForPair.length) continue;
-
     for (const match of matchesForPair) {
-      await insertMatch({
-        userId: source.userId,
-        matchedUserId: target.userId,
+      const shared = {
         matchType: match.matchType,
         score: match.score,
-        sourceTripId: source.id,
-        matchedTripId: target.id,
         city: match.city,
         flightNumber: match.flightNumber,
         departureAirport: match.departureAirport,
         arrivalAirport: match.arrivalAirport,
         overlapStart: match.overlapStart,
         overlapEnd: match.overlapEnd,
-      });
-      await insertMatch({
-        userId: target.userId,
-        matchedUserId: source.userId,
-        matchType: match.matchType,
-        score: match.score,
-        sourceTripId: target.id,
-        matchedTripId: source.id,
-        city: match.city,
-        flightNumber: match.flightNumber,
-        departureAirport: match.departureAirport,
-        arrivalAirport: match.arrivalAirport,
-        overlapStart: match.overlapStart,
-        overlapEnd: match.overlapEnd,
-      });
-      insertedMatches += 2;
+      };
+      rows.push(
+        matchRow({
+          ...shared,
+          userId: source.userId,
+          matchedUserId: target.userId,
+          sourceTripId: source.id,
+          matchedTripId: target.id,
+        }),
+        matchRow({
+          ...shared,
+          userId: target.userId,
+          matchedUserId: source.userId,
+          sourceTripId: target.id,
+          matchedTripId: source.id,
+        }),
+      );
     }
-
-    void pairKey;
   }
 
+  const insertedMatches = await insertMatches(rows);
   return { deletedMatches, insertedMatches };
 }

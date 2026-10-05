@@ -24,16 +24,14 @@ event_triggers:
   - name: user_trips_match_compute
     definition:
       enable_manual: false
-      insert:
-        columns: '*'
       update:
-        columns: '*'
-      delete:
-        columns: '*'
+        columns:
+          - is_active
+          - visibility
     retry_conf:
       interval_sec: 10
-      num_retries: 3
-      timeout_sec: 120
+      num_retries: 0
+      timeout_sec: 30
     webhook: '{{NHOST_FUNCTIONS_URL}}/internal/trip-matches-compute'
     headers:
       - name: nhost-webhook-secret

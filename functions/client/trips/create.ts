@@ -308,6 +308,7 @@ export default async function createTrip(req: Request, res: Response) {
       return res.status(500).json({ message: 'Failed to create trip' });
     }
 
+    // The user_trips webhook ignores service writes, so this is the one recompute for a created trip.
     void recomputeTripMatches(trip.id).catch((error) => {
       console.error('trip match recompute failed after create', trip.id, error);
     });

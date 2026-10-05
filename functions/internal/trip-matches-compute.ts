@@ -60,6 +60,11 @@ export default async function tripMatchesCompute(req: Request, res: Response) {
   }
 
   try {
+    const role = req.body.event.session_variables?.['x-hasura-role'];
+    if (role === 'service' || role === 'admin') {
+      return res.status(200).json({ message: 'Skipped service write', skipped: true });
+    }
+
     const tripId = await resolveTripId(req.body);
     if (!tripId) {
       return res.status(400).json({ message: 'Could not resolve trip id' });

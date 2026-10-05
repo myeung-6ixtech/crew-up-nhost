@@ -105,6 +105,7 @@ export default async function updateTrip(req: Request, res: Response) {
       }
     }
 
+    // The user_trips webhook ignores service writes, so this is the one recompute for an updated trip.
     void recomputeTripMatches(tripId).catch((error) => {
       console.error('trip match recompute failed after update', tripId, error);
     });
