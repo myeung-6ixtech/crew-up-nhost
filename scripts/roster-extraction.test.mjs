@@ -143,6 +143,8 @@ test('gemini call sends redacted text with the schema and parses the reply', asy
   process.env.ROSTER_LLM_PROVIDER = 'gemini';
   process.env.GEMINI_API_KEY = 'test-key';
   process.env.ROSTER_LLM_MODEL = 'gemini-3.1-flash-lite';
+  delete process.env.OPENROUTER_API_KEY;
+  delete process.env.ROSTER_LLM_MODELS;
   let request;
   t.mock.method(globalThis, 'fetch', async (url, init) => {
     request = { url, init, body: JSON.parse(init.body) };
@@ -171,6 +173,8 @@ test('gemini call sends redacted text with the schema and parses the reply', asy
 test('gemini failures map to roster error codes', async (t) => {
   process.env.ROSTER_LLM_PROVIDER = 'gemini';
   process.env.GEMINI_API_KEY = 'test-key';
+  delete process.env.OPENROUTER_API_KEY;
+  delete process.env.ROSTER_LLM_MODELS;
 
   t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 429 }));
   await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), { code: 'ROSTER_PARSER_BUSY' });
@@ -230,6 +234,60 @@ test('openrouter tries the next model once when the first reply is not a roster'
   assert.equal(calls, 2);
   assert.deepEqual(bodies[1].models, ['second:free']);
   assert.equal(result.extraction.duties[0].flight_number, 'SQ322');
+});
+
+test('openrouter does not inherit the Gemini model name', async (t) => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODEL = 'gemini-3.1-flash-lite';
+  process.env.ROSTER_LLM_MODELS = 'writer/free-text:free';
+  let models;
+  t.mock.method(globalThis, 'fetch', async (_url, init) => {
+    models = JSON.parse(init.body).models;
+    return new Response(
+      JSON.stringify({
+        model: 'writer/free-text:free',
+        choices: [{ message: { content: JSON.stringify({ home_base: null, duties: [leg({})], warnings: [] }) } }],
+      }),
+      { status: 200 },
+    );
+  });
+
+  await extractRosterDuties({ kind: 'text', text: 'x' });
+  assert.deepEqual(models, ['writer/free-text:free']);
+});
+
+test('openrouter without its own model list does not call Gemini', async () => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODEL = 'gemini-3.1-flash-lite';
+  process.env.ROSTER_LLM_MODELS = '';
+  process.env.GEMINI_API_KEY = 'test-key';
+  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), { code: 'ROSTER_PARSER_UNAVAILABLE' });
+});
+
+test('a leftover gemini provider does not win when OpenRouter is configured', async (t) => {
+  process.env.ROSTER_LLM_PROVIDER = 'gemini';
+  process.env.GEMINI_API_KEY = 'test-key';
+  process.env.ROSTER_LLM_MODEL = 'gemini-3.1-flash-lite';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODELS = 'writer/free-text:free';
+  let url = '';
+  t.mock.method(globalThis, 'fetch', async (requestUrl, init) => {
+    url = String(requestUrl);
+    assert.equal(JSON.parse(init.body).models.includes('gemini-3.1-flash-lite'), false);
+    return new Response(
+      JSON.stringify({
+        model: 'writer/free-text:free',
+        choices: [{ message: { content: JSON.stringify({ home_base: null, duties: [leg({})], warnings: [] }) } }],
+      }),
+      { status: 200 },
+    );
+  });
+
+  const result = await extractRosterDuties({ kind: 'text', text: 'x' });
+  assert.equal(url, 'https://openrouter.ai/api/v1/chat/completions');
+  assert.equal(result.model, 'writer/free-text:free');
 });
 
 test('openrouter payment refusal is a forwarded roster error', async (t) => {

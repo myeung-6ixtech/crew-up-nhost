@@ -32,34 +32,65 @@ type GenerateContentResponse = {
   usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
 };
 
-function modelList(): string[] {
-  const listed = (process.env.ROSTER_LLM_MODELS ?? '')
-    .split(',')
-    .map((model) => model.trim())
-    .filter(Boolean);
-  if (listed.length) return listed;
-  const single = process.env.ROSTER_LLM_MODEL?.trim();
-  return single ? [single] : [];
+function unquote(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith("'") && trimmed.endsWith("'")) ||
+    (trimmed.startsWith('"') && trimmed.endsWith('"'))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
 }
 
+function env(name: string): string {
+  return unquote(process.env[name] ?? '');
+}
+
+function csv(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((item) => unquote(item))
+    .filter(Boolean);
+}
+
+/**
+ * ROSTER_LLM_MODELS and OPENROUTER_API_KEY select OpenRouter.
+ * ROSTER_LLM_MODEL and GEMINI_API_KEY are used only when OpenRouter is not configured.
+ * A leftover ROSTER_LLM_PROVIDER=gemini does not keep calling Gemini once the OpenRouter settings are present.
+ */
 export function rosterLlmConfig() {
-  const provider = (process.env.ROSTER_LLM_PROVIDER ?? 'gemini').trim().toLowerCase();
+  const requested = env('ROSTER_LLM_PROVIDER').toLowerCase();
   /** Sending the raw file skips redaction, so it must only be enabled when the route does not train on inputs. */
-  const allowRawFiles = process.env.ROSTER_LLM_ALLOW_RAW_FILES?.trim().toLowerCase() === 'true';
-  if (provider === 'openrouter') {
-    const apiKey = process.env.OPENROUTER_API_KEY?.trim() ?? '';
-    const models = modelList();
-    return { provider, enabled: Boolean(apiKey) && models.length > 0, apiKey, models, allowRawFiles };
+  const allowRawFiles = env('ROSTER_LLM_ALLOW_RAW_FILES').toLowerCase() === 'true';
+  const openRouterKey = env('OPENROUTER_API_KEY');
+  const openRouterModels = csv(process.env.ROSTER_LLM_MODELS);
+
+  if (requested !== 'gemini' && requested !== 'none' && requested !== 'openrouter' && requested !== '') {
+    return { provider: 'none' as const, enabled: false, apiKey: '', models: [] as string[], allowRawFiles };
   }
-  const apiKey = process.env.GEMINI_API_KEY?.trim() ?? '';
-  const model = process.env.ROSTER_LLM_MODEL?.trim() || DEFAULT_MODEL;
-  return {
-    provider: 'gemini' as const,
-    enabled: provider === 'gemini' && Boolean(apiKey),
-    apiKey,
-    models: [model],
-    allowRawFiles,
-  };
+
+  if (requested !== 'none' && openRouterKey && openRouterModels.length > 0) {
+    return {
+      provider: 'openrouter' as const,
+      enabled: true,
+      apiKey: openRouterKey,
+      models: openRouterModels,
+      allowRawFiles,
+    };
+  }
+
+  if (requested === 'openrouter') {
+    return { provider: 'openrouter' as const, enabled: false, apiKey: openRouterKey, models: openRouterModels, allowRawFiles };
+  }
+
+  if (requested === 'gemini' || (requested === '' && env('GEMINI_API_KEY'))) {
+    const apiKey = env('GEMINI_API_KEY');
+    const model = env('ROSTER_LLM_MODEL') || DEFAULT_MODEL;
+    return { provider: 'gemini' as const, enabled: Boolean(apiKey), apiKey, models: [model], allowRawFiles };
+  }
+
+  return { provider: 'none' as const, enabled: false, apiKey: '', models: [] as string[], allowRawFiles };
 }
 
 function requestBody(input: RosterLlmInput) {

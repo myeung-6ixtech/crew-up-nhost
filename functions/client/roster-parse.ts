@@ -109,7 +109,7 @@ export default async function rosterParse(req: Request, res: Response) {
 
     const config = rosterLlmConfig();
     if (!config.enabled) {
-      throw new RosterImportError('ROSTER_PARSER_UNAVAILABLE', 'Roster LLM is not configured', 503);
+      throw new RosterImportError('ROSTER_PARSER_UNAVAILABLE', 'Roster LLM is not configured', 422);
     }
 
     const mimeType = (file.mimeType ?? '').toLowerCase().replace('image/jpg', 'image/jpeg');
@@ -124,6 +124,7 @@ export default async function rosterParse(req: Request, res: Response) {
 
     log('info', 'parsed', {
       parser: PARSER_VERSION,
+      provider: config.provider,
       model: result.model,
       inputKind: input.kind,
       pages,
