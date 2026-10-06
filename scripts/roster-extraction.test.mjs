@@ -163,6 +163,7 @@ test('gemini call sends redacted text with the schema and parses the reply', asy
 
   assert.match(request.url, /models\/gemini-3\.1-flash-lite:generateContent$/);
   assert.equal(request.init.headers['x-goog-api-key'], 'test-key');
+  assert.equal(request.body.generationConfig.maxOutputTokens, 4096);
   assert.equal(request.body.generationConfig.responseMimeType, 'application/json');
   assert.ok(request.body.generationConfig.responseJsonSchema.properties.duties);
   assert.equal('temperature' in request.body.generationConfig, false);
@@ -176,8 +177,13 @@ test('gemini failures map to roster error codes', async (t) => {
   delete process.env.OPENROUTER_API_KEY;
   delete process.env.ROSTER_LLM_MODELS;
 
-  t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 429 }));
+  let rateLimitCalls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    rateLimitCalls += 1;
+    return new Response('{}', { status: 429 });
+  });
   await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), { code: 'ROSTER_PARSER_BUSY' });
+  assert.equal(rateLimitCalls, 1);
 
   t.mock.method(globalThis, 'fetch', async () =>
     new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'not json' }] } }] }), { status: 200 }),
@@ -210,6 +216,7 @@ test('openrouter sends the model list and parses the reply', async (t) => {
   assert.equal(request.url, 'https://openrouter.ai/api/v1/chat/completions');
   assert.equal(request.init.headers.authorization, 'Bearer or-test');
   assert.deepEqual(request.body.models, ['writer/free-text:free', 'vision/free-photo:free']);
+  assert.equal(request.body.max_tokens, 4096);
   assert.equal(request.body.provider.data_collection, 'deny');
   assert.equal(request.body.messages[1].content.startsWith('--- ROSTER TEXT ---'), true);
   assert.equal(result.model, 'writer/free-text:free');
@@ -288,6 +295,23 @@ test('a leftover gemini provider does not win when OpenRouter is configured', as
   const result = await extractRosterDuties({ kind: 'text', text: 'x' });
   assert.equal(url, 'https://openrouter.ai/api/v1/chat/completions');
   assert.equal(result.model, 'writer/free-text:free');
+});
+
+test('openrouter rate limit is reported from a single request', async (t) => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODELS = 'first:free, second:free';
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ error: { message: 'Provider returned error' } }), { status: 429 });
+  });
+
+  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), {
+    code: 'ROSTER_PARSER_BUSY',
+    message: 'OpenRouter rate limit reached: Provider returned error',
+  });
+  assert.equal(calls, 1);
 });
 
 test('openrouter payment refusal is a forwarded roster error', async (t) => {

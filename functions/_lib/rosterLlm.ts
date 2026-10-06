@@ -13,8 +13,8 @@ const TIMEOUT_MS = 25_000;
 const RETRY_DELAY_MS = 1_500;
 /** Hasura actions drop 5xx bodies, so the app never sees the error code. 422 still carries it. */
 const FORWARDED_ERROR = 422;
-/** A dense month is ~4k output tokens; the cap stops a looping response from running up cost. */
-const MAX_OUTPUT_TOKENS = 16_384;
+/** A month of duties fits in this. A larger cap makes free hosts reject or stall the call. */
+const MAX_OUTPUT_TOKENS = 4_096;
 
 export type RosterLlmInput =
   | { kind: 'text'; text: string }
@@ -170,7 +170,8 @@ async function callOnce(url: string, headers: Record<string, string>, body: unkn
   }
 }
 
-const isRetryable = (status: number) => status === 429 || status >= 500;
+/** A 429 is the provider's own limit. Sending the same roster again spends another request on that wall. */
+const isRetryable = (status: number) => status >= 500;
 
 const PROVIDER_REASON_LIMIT = 200;
 
