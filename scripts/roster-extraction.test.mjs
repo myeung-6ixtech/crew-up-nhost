@@ -294,6 +294,25 @@ test('openrouter payment refusal is a forwarded roster error', async (t) => {
   process.env.ROSTER_LLM_PROVIDER = 'openrouter';
   process.env.OPENROUTER_API_KEY = 'or-test';
   process.env.ROSTER_LLM_MODELS = 'first:free';
-  t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status: 402 }));
-  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), { code: 'ROSTER_PARSER_UNAVAILABLE', statusCode: 422 });
+  t.mock.method(globalThis, 'fetch', async () =>
+    new Response(JSON.stringify({ error: { message: 'Key not allowed to use this model', code: 403 } }), { status: 403 }),
+  );
+  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), {
+    code: 'ROSTER_PARSER_UNAVAILABLE',
+    statusCode: 422,
+    message: 'OpenRouter refused the request (403): Key not allowed to use this model',
+  });
+});
+
+test('openrouter error text that looks like a roster is not kept', async (t) => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODELS = 'first:free';
+  t.mock.method(globalThis, 'fetch', async () =>
+    new Response(JSON.stringify({ error: { message: '03OCT SQ322 SIN\nLHR 0615' } }), { status: 403 }),
+  );
+  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), {
+    code: 'ROSTER_PARSER_UNAVAILABLE',
+    message: 'OpenRouter request failed with status 403',
+  });
 });

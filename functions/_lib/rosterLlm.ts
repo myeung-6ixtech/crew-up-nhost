@@ -172,15 +172,36 @@ async function callOnce(url: string, headers: Record<string, string>, body: unkn
 
 const isRetryable = (status: number) => status === 429 || status >= 500;
 
-function providerFailure(status: number, label: string): RosterImportError {
+const PROVIDER_REASON_LIMIT = 200;
+
+/** A short one-line provider message is safe to log. Longer text can be the roster, so it is dropped. */
+function safeProviderReason(body: string): string | null {
+  let message = '';
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: unknown } | string; message?: unknown };
+    const detail = parsed?.error;
+    if (typeof detail === 'string') message = detail;
+    else if (detail && typeof detail === 'object' && typeof detail.message === 'string') message = detail.message;
+    else if (typeof parsed?.message === 'string') message = parsed.message;
+  } catch {
+    return null;
+  }
+  const reason = message.trim();
+  if (!reason || reason.length > PROVIDER_REASON_LIMIT || /[\r\n]/.test(reason)) return null;
+  return reason;
+}
+
+async function providerFailure(response: Response, label: string): Promise<RosterImportError> {
+  const status = response.status;
+  const reason = safeProviderReason(await response.text().catch(() => ''));
+  const detail = reason ? `${label} refused the request (${status}): ${reason}` : `${label} request failed with status ${status}`;
   if (status === 429) {
-    return new RosterImportError('ROSTER_PARSER_BUSY', `${label} rate limit reached`, 429);
+    return new RosterImportError('ROSTER_PARSER_BUSY', reason ? `${label} rate limit reached: ${reason}` : `${label} rate limit reached`, 429);
   }
-  // The error body can echo request content, so only the status is kept.
   if (status >= 500) {
-    return new RosterImportError('ROSTER_PARSER_TIMEOUT', `${label} request failed with status ${status}`, FORWARDED_ERROR);
+    return new RosterImportError('ROSTER_PARSER_TIMEOUT', detail, FORWARDED_ERROR);
   }
-  return new RosterImportError('ROSTER_PARSER_UNAVAILABLE', `${label} request failed with status ${status}`, FORWARDED_ERROR);
+  return new RosterImportError('ROSTER_PARSER_UNAVAILABLE', detail, FORWARDED_ERROR);
 }
 
 async function callWithRetry(url: string, headers: Record<string, string>, body: unknown, label: string): Promise<Response> {
@@ -249,7 +270,7 @@ async function extractWithGemini(input: RosterLlmInput, apiKey: string, model: s
     body,
     'Gemini',
   );
-  if (!response.ok) throw providerFailure(response.status, 'Gemini');
+  if (!response.ok) throw await providerFailure(response, 'Gemini');
 
   const payload = (await response.json()) as GenerateContentResponse;
   const result = geminiResult(payload, model);
@@ -265,7 +286,7 @@ async function extractWithGemini(input: RosterLlmInput, apiKey: string, model: s
 async function extractWithOpenRouter(input: RosterLlmInput, apiKey: string, models: string[]): Promise<RosterLlmResult> {
   const headers = { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` };
   const response = await callWithRetry(OPENROUTER_URL, headers, openRouterBody(models, input), 'OpenRouter');
-  if (!response.ok) throw providerFailure(response.status, 'OpenRouter');
+  if (!response.ok) throw await providerFailure(response, 'OpenRouter');
 
   const payload = (await response.json()) as OpenRouterResponse;
   const result = openRouterResult(payload, models[0]);
@@ -277,7 +298,7 @@ async function extractWithOpenRouter(input: RosterLlmInput, apiKey: string, mode
   }
 
   const retry = await callWithRetry(OPENROUTER_URL, headers, openRouterBody(remaining, input), 'OpenRouter');
-  if (!retry.ok) throw providerFailure(retry.status, 'OpenRouter');
+  if (!retry.ok) throw await providerFailure(retry, 'OpenRouter');
   const retryPayload = (await retry.json()) as OpenRouterResponse;
   const retryResult = openRouterResult(retryPayload, remaining[0]);
   if (!retryResult) {
