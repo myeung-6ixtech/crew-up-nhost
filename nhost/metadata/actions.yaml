@@ -4,6 +4,7 @@ actions:
       kind: synchronous
       handler: '{{NHOST_FUNCTIONS_URL}}/client/roster-parse'
       forward_client_headers: true
+      timeout: 90
     permissions:
       - role: user
     comment: Parse uploaded roster file into structured layover entries for confirmation

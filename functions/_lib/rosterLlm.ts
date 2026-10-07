@@ -9,7 +9,8 @@ import {
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
-const TIMEOUT_MS = 25_000;
+/** Must stay under the parseRoster action timeout so the app gets a roster error, not a webhook timeout. */
+const TIMEOUT_MS = 80_000;
 const RETRY_DELAY_MS = 1_500;
 /** Hasura actions drop 5xx bodies, so the app never sees the error code. 422 still carries it. */
 const FORWARDED_ERROR = 422;

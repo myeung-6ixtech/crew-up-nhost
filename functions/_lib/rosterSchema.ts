@@ -75,7 +75,7 @@ export const ROSTER_EXTRACTION_SCHEMA = {
 export const ROSTER_EXTRACTION_INSTRUCTIONS = `You extract airline crew duties from a roster.
 
 Rules:
-1. Return every duty in the roster, including non-flying duties (standby, off, training).
+1. Return only flights and deadheads. Leave out standby, off, training and other ground duties.
 2. Use type "deadhead" for positioning flights (often marked DH, DHD, PAX or POS).
 3. Times must be ISO 8601 with an explicit UTC offset. If the roster states times are UTC/Z, use +00:00. If they are local times, use the offset of that airport on that date. If you cannot tell which, set the time to null and add a warning.
 4. Arrivals after midnight belong to the next date; do not reuse the departure date.
