@@ -7,7 +7,7 @@ actions:
       timeout: 90
     permissions:
       - role: user
-    comment: Parse uploaded roster file into structured layover entries for confirmation
+    comment: Parse uploaded roster file into trips (flights and layovers) for confirmation
   - name: submitReport
     definition:
       kind: synchronous
@@ -22,5 +22,7 @@ custom_types:
   objects:
     - name: RosterParseResult
     - name: RosterParseEntry
+    - name: RosterParseTrip
+    - name: RosterParseLeg
     - name: SubmitReportOutput
   scalars: []

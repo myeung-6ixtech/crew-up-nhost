@@ -1,4 +1,4 @@
-import type { RosterParseEntry } from './auth.js';
+import type { RosterParseEntry, RosterParseLeg, RosterParseTrip } from './auth.js';
 
 export const DUTY_TYPES = ['flight', 'deadhead', 'standby', 'off', 'training', 'other'] as const;
 export type DutyType = (typeof DUTY_TYPES)[number];
@@ -12,6 +12,8 @@ export interface ExtractedDuty {
   scheduled_departure: string | null;
   scheduled_arrival: string | null;
   confidence: number;
+  /** Not asked of the model: the printed date before the time is converted to UTC. */
+  departure_local_date?: string | null;
 }
 
 export interface RosterExtraction {
@@ -135,6 +137,9 @@ export function validateExtraction(raw: unknown): RosterExtraction | null {
       scheduled_departure: cleanTimestamp(duty.scheduled_departure),
       scheduled_arrival: cleanTimestamp(duty.scheduled_arrival),
       confidence,
+      departure_local_date: cleanTimestamp(duty.scheduled_departure)
+        ? String(duty.scheduled_departure).trim().slice(0, 10)
+        : null,
     });
   }
 
@@ -166,37 +171,103 @@ function isCompleteLeg(duty: ExtractedDuty): duty is FlightLeg {
   );
 }
 
+const LOW_CONFIDENCE = 0.8;
+
+function sortedLegs(extraction: RosterExtraction): FlightLeg[] {
+  return extraction.duties
+    .filter(isCompleteLeg)
+    .sort((a, b) => a.scheduled_departure.localeCompare(b.scheduled_departure));
+}
+
+function homeBaseOf(extraction: RosterExtraction, legs: FlightLeg[]): string | null {
+  return extraction.home_base ?? legs[0]?.departure_airport ?? null;
+}
+
+function groundMs(inbound: FlightLeg, outbound: FlightLeg): number {
+  return new Date(outbound.scheduled_departure).getTime() - new Date(inbound.scheduled_arrival).getTime();
+}
+
+/** A layover is landing away from base and departing that same airport after a long enough gap. */
+function layoverBetween(inbound: FlightLeg, outbound: FlightLeg, homeBase: string | null): RosterParseEntry | null {
+  if (inbound.arrival_airport === homeBase) return null;
+  if (inbound.arrival_airport !== outbound.departure_airport) return null;
+  const gap = groundMs(inbound, outbound);
+  if (gap < MIN_LAYOVER_MS || gap > MAX_LAYOVER_MS) return null;
+  return {
+    flightNumber: inbound.flight_number,
+    departureAirport: inbound.departure_airport,
+    arrivalAirport: inbound.arrival_airport,
+    layoverCity: inbound.arrival_city ?? inbound.arrival_airport,
+    layoverStart: inbound.scheduled_arrival,
+    layoverEnd: outbound.scheduled_departure,
+  };
+}
+
 /**
  * Derives layovers from consecutive legs: the crew lands away from base and the
  * next leg departs from that same airport.
  */
 export function layoversFromExtraction(extraction: RosterExtraction): RosterParseEntry[] {
-  const legs = extraction.duties
-    .filter(isCompleteLeg)
-    .sort((a, b) => a.scheduled_departure.localeCompare(b.scheduled_departure));
-
-  const homeBase = extraction.home_base ?? legs[0]?.departure_airport ?? null;
+  const legs = sortedLegs(extraction);
+  const homeBase = homeBaseOf(extraction, legs);
   const layovers: RosterParseEntry[] = [];
-
   for (let index = 0; index < legs.length - 1; index += 1) {
-    const inbound = legs[index];
-    const outbound = legs[index + 1];
-    if (inbound.arrival_airport === homeBase) continue;
-    if (inbound.arrival_airport !== outbound.departure_airport) continue;
-
-    const groundMs =
-      new Date(outbound.scheduled_departure).getTime() - new Date(inbound.scheduled_arrival).getTime();
-    if (groundMs < MIN_LAYOVER_MS || groundMs > MAX_LAYOVER_MS) continue;
-
-    layovers.push({
-      flightNumber: inbound.flight_number,
-      departureAirport: inbound.departure_airport,
-      arrivalAirport: inbound.arrival_airport,
-      layoverCity: inbound.arrival_city ?? inbound.arrival_airport,
-      layoverStart: inbound.scheduled_arrival,
-      layoverEnd: outbound.scheduled_departure,
-    });
+    const layover = layoverBetween(legs[index], legs[index + 1], homeBase);
+    if (layover) layovers.push(layover);
   }
-
   return layovers;
+}
+
+function toParseLeg(leg: FlightLeg): RosterParseLeg {
+  return {
+    flightNumber: leg.flight_number,
+    departureAirport: leg.departure_airport,
+    arrivalAirport: leg.arrival_airport,
+    serviceDate: leg.departure_local_date ?? leg.scheduled_departure.slice(0, 10),
+    scheduledDeparture: leg.scheduled_departure,
+    scheduledArrival: leg.scheduled_arrival,
+    deadhead: leg.type === 'deadhead',
+    lowConfidence: leg.confidence < LOW_CONFIDENCE,
+  };
+}
+
+/**
+ * Groups legs into pairings. A trip closes when a leg lands at base, or when the
+ * next leg does not continue from where the last one landed (a duty is missing).
+ */
+export function tripsFromExtraction(extraction: RosterExtraction): {
+  homeBase: string | null;
+  trips: RosterParseTrip[];
+  skippedDuties: number;
+} {
+  const legs = sortedLegs(extraction);
+  const homeBase = homeBaseOf(extraction, legs);
+  const trips: RosterParseTrip[] = [];
+  let current: FlightLeg[] = [];
+
+  const close = () => {
+    if (!current.length) return;
+    const layovers: RosterParseEntry[] = [];
+    for (let index = 0; index < current.length - 1; index += 1) {
+      const layover = layoverBetween(current[index], current[index + 1], homeBase);
+      if (layover) layovers.push(layover);
+    }
+    trips.push({ legs: current.map(toParseLeg), layovers });
+    current = [];
+  };
+
+  for (const leg of legs) {
+    const previous = current[current.length - 1];
+    if (
+      previous &&
+      (previous.arrival_airport !== leg.departure_airport || groundMs(previous, leg) > MAX_LAYOVER_MS)
+    ) {
+      close();
+    }
+    current.push(leg);
+    if (leg.arrival_airport === homeBase) close();
+  }
+  close();
+
+  return { homeBase, trips, skippedDuties: extraction.duties.length - legs.length };
 }

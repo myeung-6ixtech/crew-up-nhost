@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const { redactRosterText } = await import('../functions/_lib/rosterRedact.ts');
-const { validateExtraction, layoversFromExtraction } = await import('../functions/_lib/rosterSchema.ts');
+const { validateExtraction, layoversFromExtraction, tripsFromExtraction } = await import(
+  '../functions/_lib/rosterSchema.ts'
+);
 const { extractPdfText } = await import('../functions/_lib/rosterPdf.ts');
 const { extractRosterDuties } = await import('../functions/_lib/rosterLlm.ts');
 
@@ -124,6 +126,74 @@ test('layovers come from consecutive legs away from base', () => {
     layoverStart: '2026-10-04T05:15:00.000Z',
     layoverEnd: '2026-10-05T10:00:00.000Z',
   });
+});
+
+test('legs are grouped into pairings that return to base', () => {
+  const extraction = validateExtraction({
+    home_base: 'SIN',
+    duties: [
+      leg({}),
+      leg({
+        flight_number: 'SQ317',
+        departure_airport: 'LHR',
+        arrival_airport: 'SIN',
+        scheduled_departure: '2026-10-05T11:00:00+01:00',
+        scheduled_arrival: '2026-10-06T07:30:00+08:00',
+      }),
+      leg({
+        flight_number: 'SQ857',
+        departure_airport: 'HKG',
+        arrival_airport: 'SIN',
+        scheduled_departure: '2026-10-08T14:10:00+08:00',
+        scheduled_arrival: '2026-10-08T18:05:00+08:00',
+        confidence: 0.5,
+      }),
+      leg({
+        flight_number: 'SQ856',
+        departure_airport: 'SIN',
+        arrival_airport: 'HKG',
+        scheduled_departure: '2026-10-08T09:00:00+08:00',
+        scheduled_arrival: '2026-10-08T12:50:00+08:00',
+      }),
+      { ...leg({ type: 'standby' }), flight_number: null, departure_airport: null },
+    ],
+    warnings: [],
+  });
+
+  const { homeBase, trips, skippedDuties } = tripsFromExtraction(extraction);
+  assert.equal(homeBase, 'SIN');
+  assert.equal(skippedDuties, 1);
+  assert.equal(trips.length, 2);
+
+  assert.deepEqual(trips[0].legs.map((l) => l.flightNumber), ['SQ322', 'SQ317']);
+  assert.equal(trips[0].legs[0].serviceDate, '2026-10-03', 'local departure date, not the UTC one');
+  assert.equal(trips[0].legs[0].scheduledDeparture, '2026-10-03T15:30:00.000Z');
+  assert.equal(trips[0].layovers.length, 1);
+  assert.equal(trips[0].layovers[0].layoverCity, 'London');
+
+  assert.deepEqual(trips[1].legs.map((l) => l.flightNumber), ['SQ856', 'SQ857']);
+  assert.equal(trips[1].layovers.length, 0, 'same-day turnaround has no layover');
+  assert.equal(trips[1].legs[1].lowConfidence, true);
+});
+
+test('a break in the route starts a new trip', () => {
+  const extraction = validateExtraction({
+    home_base: 'SIN',
+    duties: [
+      leg({}),
+      leg({
+        flight_number: 'SQ12',
+        departure_airport: 'NRT',
+        arrival_airport: 'SIN',
+        scheduled_departure: '2026-10-07T10:00:00+09:00',
+        scheduled_arrival: '2026-10-07T16:00:00+08:00',
+      }),
+    ],
+    warnings: [],
+  });
+  const { trips } = tripsFromExtraction(extraction);
+  assert.equal(trips.length, 2);
+  assert.equal(trips[0].layovers.length, 0);
 });
 
 test('pdf text keeps one printed row per line', async () => {

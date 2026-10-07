@@ -47,6 +47,24 @@ export interface RosterParseEntry {
   layoverEnd?: string | null;
 }
 
+export interface RosterParseLeg {
+  flightNumber: string | null;
+  departureAirport: string;
+  arrivalAirport: string;
+  /** Departure date as printed at the origin (YYYY-MM-DD). */
+  serviceDate: string;
+  scheduledDeparture: string;
+  scheduledArrival: string;
+  deadhead: boolean;
+  lowConfidence: boolean;
+}
+
+/** One pairing: leaves base, flies one or more legs, comes back. */
+export interface RosterParseTrip {
+  legs: RosterParseLeg[];
+  layovers: RosterParseEntry[];
+}
+
 export interface MessageRow {
   id: string;
   thread_id: string;

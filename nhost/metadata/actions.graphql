@@ -12,6 +12,25 @@ type Mutation {
 type RosterParseResult {
   sourceFileId: uuid!
   entries: [RosterParseEntry!]!
+  homeBase: String
+  trips: [RosterParseTrip!]
+  skippedDuties: Int
+}
+
+type RosterParseTrip {
+  legs: [RosterParseLeg!]!
+  layovers: [RosterParseEntry!]!
+}
+
+type RosterParseLeg {
+  flightNumber: String
+  departureAirport: String!
+  arrivalAirport: String!
+  serviceDate: String!
+  scheduledDeparture: timestamptz!
+  scheduledArrival: timestamptz!
+  deadhead: Boolean!
+  lowConfidence: Boolean!
 }
 
 type RosterParseEntry {

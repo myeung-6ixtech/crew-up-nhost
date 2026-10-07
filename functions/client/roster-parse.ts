@@ -5,7 +5,7 @@ import { RosterImportError } from '../_lib/rosterErrors.js';
 import { extractRosterDuties, rosterLlmConfig, type RosterLlmInput } from '../_lib/rosterLlm.js';
 import { extractPdfText } from '../_lib/rosterPdf.js';
 import { redactRosterText } from '../_lib/rosterRedact.js';
-import { PARSER_VERSION, layoversFromExtraction } from '../_lib/rosterSchema.js';
+import { PARSER_VERSION, layoversFromExtraction, tripsFromExtraction } from '../_lib/rosterSchema.js';
 import { downloadFileAsUser } from '../_lib/storage.js';
 
 interface ActionPayload {
@@ -121,6 +121,7 @@ export default async function rosterParse(req: Request, res: Response) {
     const { input, pages, redactedLines } = await modelInput(bytes, mimeType, config.allowRawFiles);
     const result = await extractRosterDuties(input);
     const entries = layoversFromExtraction(result.extraction);
+    const { homeBase, trips, skippedDuties } = tripsFromExtraction(result.extraction);
 
     log('info', 'parsed', {
       parser: PARSER_VERSION,
@@ -131,13 +132,14 @@ export default async function rosterParse(req: Request, res: Response) {
       redactedLines,
       duties: result.extraction.duties.length,
       layovers: entries.length,
+      trips: trips.length,
       warnings: result.extraction.warnings.length,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       latencyMs: Date.now() - startedAt,
     });
 
-    return res.status(200).json({ sourceFileId: file.id, entries });
+    return res.status(200).json({ sourceFileId: file.id, entries, homeBase, trips, skippedDuties });
   } catch (error) {
     if (error instanceof RosterImportError) {
       log('warn', 'parse_failed', { code: error.code, reason: error.message, latencyMs: Date.now() - startedAt });
