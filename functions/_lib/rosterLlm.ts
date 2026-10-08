@@ -94,6 +94,11 @@ export function rosterLlmConfig() {
   return { provider: 'none' as const, enabled: false, apiKey: '', models: [] as string[], allowRawFiles };
 }
 
+/** Rosters often print day and month only; the model needs today to pick the year. */
+function todayLine(): string {
+  return `Today's date: ${new Date().toISOString().slice(0, 10)}`;
+}
+
 function requestBody(input: RosterLlmInput) {
   const inputPart =
     input.kind === 'text'
@@ -102,7 +107,7 @@ function requestBody(input: RosterLlmInput) {
 
   return {
     system_instruction: { parts: [{ text: ROSTER_EXTRACTION_INSTRUCTIONS }] },
-    contents: [{ role: 'user', parts: [inputPart] }],
+    contents: [{ role: 'user', parts: [{ text: todayLine() }, inputPart] }],
     // Temperature stays at the Gemini 3 default: Google warns lower values can cause looping.
     generationConfig: {
       maxOutputTokens: MAX_OUTPUT_TOKENS,
@@ -114,17 +119,17 @@ function requestBody(input: RosterLlmInput) {
 
 function openRouterContent(input: RosterLlmInput) {
   if (input.kind === 'text') {
-    return `--- ROSTER TEXT ---\n${input.text}`;
+    return `${todayLine()}\n--- ROSTER TEXT ---\n${input.text}`;
   }
   const data = input.bytes.toString('base64');
   if (input.mimeType === 'application/pdf') {
     return [
-      { type: 'text', text: 'Extract the duties from this roster PDF.' },
+      { type: 'text', text: `${todayLine()}\nExtract the duties from this roster PDF.` },
       { type: 'file', file: { filename: 'roster.pdf', file_data: `data:application/pdf;base64,${data}` } },
     ];
   }
   return [
-    { type: 'text', text: 'Extract the duties from this roster image.' },
+    { type: 'text', text: `${todayLine()}\nExtract the duties from this roster image.` },
     { type: 'image_url', image_url: { url: `data:${input.mimeType};base64,${data}` } },
   ];
 }

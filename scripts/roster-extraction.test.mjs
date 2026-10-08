@@ -176,6 +176,17 @@ test('legs are grouped into pairings that return to base', () => {
   assert.equal(trips[1].legs[1].lowConfidence, true);
 });
 
+test('a leg that lands before it departs is left out of trips', () => {
+  const extraction = validateExtraction({
+    home_base: 'SIN',
+    duties: [leg({ scheduled_arrival: '2026-10-03T06:15:00+01:00' })],
+    warnings: [],
+  });
+  const { trips, skippedDuties } = tripsFromExtraction(extraction);
+  assert.equal(trips.length, 0);
+  assert.equal(skippedDuties, 1);
+});
+
 test('a break in the route starts a new trip', () => {
   const extraction = validateExtraction({
     home_base: 'SIN',
@@ -288,7 +299,7 @@ test('openrouter sends the model list and parses the reply', async (t) => {
   assert.deepEqual(request.body.models, ['writer/free-text:free', 'vision/free-photo:free']);
   assert.equal(request.body.max_tokens, 4096);
   assert.equal(request.body.provider.data_collection, 'deny');
-  assert.equal(request.body.messages[1].content.startsWith('--- ROSTER TEXT ---'), true);
+  assert.match(request.body.messages[1].content, /^Today's date: \d{4}-\d{2}-\d{2}\n--- ROSTER TEXT ---/);
   assert.equal(result.model, 'writer/free-text:free');
   assert.equal(result.extraction.duties[0].flight_number, 'SQ322');
   assert.equal(result.inputTokens, 800);

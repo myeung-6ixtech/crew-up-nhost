@@ -83,7 +83,8 @@ Rules:
 4. Arrivals after midnight belong to the next date; do not reuse the departure date.
 5. Use IATA airport codes. If only ICAO codes are printed, convert them when you are certain, otherwise keep the ICAO code.
 6. Never output a person's name, staff number, hotel, or crew list, even if present. Text shown as [redacted] was removed on purpose.
-7. Set confidence below 0.8 for anything read from an unclear or ambiguous layout.`;
+7. Set confidence below 0.8 for anything read from an unclear or ambiguous layout.
+8. If the roster does not print the year, use the year that puts the duty nearest to today's date, which is given with the roster.`;
 
 export const PARSER_VERSION = 'gemini-roster-v1';
 
@@ -167,7 +168,9 @@ function isCompleteLeg(duty: ExtractedDuty): duty is FlightLeg {
   return (
     (duty.type === 'flight' || duty.type === 'deadhead') &&
     Boolean(duty.departure_airport && duty.arrival_airport) &&
-    Boolean(duty.scheduled_departure && duty.scheduled_arrival)
+    duty.departure_airport !== duty.arrival_airport &&
+    Boolean(duty.scheduled_departure && duty.scheduled_arrival) &&
+    Date.parse(duty.scheduled_arrival!) >= Date.parse(duty.scheduled_departure!)
   );
 }
 
