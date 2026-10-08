@@ -164,6 +164,8 @@ test('mode rules: steps, advancing, and the single mode reader', () => {
   assert.equal(getAppMode(), 'beta');
   process.env.CREWUP_APP_MODE = 'launched';
   assert.equal(getAppMode(), 'launched');
+  process.env.CREWUP_APP_MODE = 'alpha';
+  assert.equal(getAppMode(), 'alpha');
   process.env.CREWUP_APP_MODE = 'LAUNCHED!';
   assert.throws(() => getAppMode());
   process.env.CREWUP_APP_MODE = previous ?? '';
@@ -229,6 +231,46 @@ test('complete rejects beta mode and outdated guidelines, then completes once in
   await completeHandler(req({ guidelinesVersion: shared.GUIDELINES_VERSION }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.state.onboardingCompletedAt, '2026-09-24T00:00:00+00:00');
+});
+
+test('alpha completes after Review without guidelines and records an auto-approved verification', async () => {
+  let state = { ...baseState, current_step: 'photo' };
+  const calls = mockGraphql({
+    EnsureOnboardingState: () => ({ insert_onboarding_state_one: null }),
+    LoadOnboarding: () => ({ profiles_by_pk: completeProfile, onboarding_state_by_pk: state }),
+    CompleteAlphaOnboarding: () => {
+      const affected = state.onboarding_completed_at ? 0 : 1;
+      state = { ...state, onboarding_completed_at: '2026-10-08T00:00:00+00:00', current_step: null };
+      return { update_onboarding_state: { affected_rows: affected }, insert_verifications_one: { id: 'v1' } };
+    },
+  });
+  const req = { method: 'POST', headers: { authorization: tokenFor(USER_ID) }, body: {} };
+  process.env.CREWUP_APP_MODE = 'alpha';
+
+  let res = mockRes();
+  await completeHandler(req, res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.error.code, 'ONBOARDING_PROFILE_INCOMPLETE');
+
+  state = { ...state, current_step: 'review' };
+  res = mockRes();
+  await completeHandler(req, res);
+  assert.equal(res.statusCode, 201, JSON.stringify(res.body));
+  assert.equal(res.body.state.onboardingCompletedAt, '2026-10-08T00:00:00+00:00');
+  assert.equal(res.body.state.betaSignupCompletedAt, null);
+
+  res = mockRes();
+  await completeHandler(req, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(calls.filter((call) => call.name === 'CompleteAlphaOnboarding').length, 1);
+});
+
+test('alpha mode: profile steps only, Review is the last step', () => {
+  assert.throws(() => lib.assertStepAllowed('alpha', 'beta_notify'), { code: 'ONBOARDING_WRONG_MODE' });
+  assert.throws(() => lib.assertStepAllowed('alpha', 'launch_guidelines'), { code: 'ONBOARDING_WRONG_MODE' });
+  assert.doesNotThrow(() => lib.assertStepAllowed('alpha', 'review'));
+  assert.equal(lib.advancedStep('alpha', 'photo'), 'review');
+  assert.equal(lib.advancedStep('alpha', 'review'), 'review');
 });
 
 test('beta-complete never sets onboarding_completed_at and is rejected after launch', async () => {

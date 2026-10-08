@@ -10,11 +10,37 @@ import {
   loadOnboarding,
   stateResponse,
   zodFields,
+  type OnboardingStateRow,
 } from '../../_lib/onboarding.js';
 import { CompleteRequestSchema, GUIDELINES_VERSION } from '../../_shared/index.js';
 
+/** Alpha has no guidelines step; finishing Review completes onboarding and auto-approves the tester. */
+async function completeAlpha(userId: string, state: OnboardingStateRow) {
+  if (state.current_step !== 'review') {
+    throw new OnboardingError(409, 'ONBOARDING_PROFILE_INCOMPLETE', 'Finish your profile first');
+  }
+  const { profile } = await loadOnboarding(userId);
+  assertProfileComplete(profile);
+
+  // The approved verification row flips profiles.is_verified via sync_profile_verified, and stays
+  // reviewable so staff can still reject a tester.
+  const data = await graphqlAsAdmin<{ update_onboarding_state: { affected_rows: number } }>(
+    `mutation CompleteAlphaOnboarding($userId: uuid!) {
+      update_onboarding_state(
+        where: { user_id: { _eq: $userId }, onboarding_completed_at: { _is_null: true } }
+        _set: { onboarding_completed_at: "now()", current_step: null }
+      ) { affected_rows }
+      insert_verifications_one(
+        object: { user_id: $userId, method: manual, status: approved, reviewed_at: "now()", notes: "alpha auto-approve" }
+      ) { id }
+    }`,
+    { userId },
+  );
+  return data.update_onboarding_state.affected_rows;
+}
+
 /**
- * POST /v1/client/onboarding/complete  { guidelinesVersion } — launched mode only.
+ * POST /v1/client/onboarding/complete — `{ guidelinesVersion }` in launched mode, `{}` in alpha.
  * Idempotent: once onboarding_completed_at is set it is returned unchanged (write-once in Postgres too).
  */
 export default async function onboardingComplete(req: Request, res: Response) {
@@ -30,7 +56,14 @@ export default async function onboardingComplete(req: Request, res: Response) {
       return res.status(200).json({ state: stateResponse(state) });
     }
 
-    if (getAppMode() !== 'launched') {
+    const mode = getAppMode();
+    if (mode === 'alpha') {
+      const affected = await completeAlpha(userId, state);
+      const refreshed = (await loadOnboarding(userId)).state ?? state;
+      return res.status(affected ? 201 : 200).json({ state: stateResponse(refreshed) });
+    }
+
+    if (mode !== 'launched') {
       throw new OnboardingError(409, 'ONBOARDING_WRONG_MODE', 'CrewUp has not launched yet');
     }
 

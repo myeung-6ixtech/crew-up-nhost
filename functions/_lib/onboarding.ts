@@ -217,6 +217,9 @@ export function columnsForStep(step: OnboardingStep, data: Record<string, unknow
 }
 
 export function assertStepAllowed(mode: AppMode, step: OnboardingStep) {
+  if (mode === 'alpha' && (isBetaStep(step) || isLaunchStep(step))) {
+    throw new OnboardingError(409, 'ONBOARDING_WRONG_MODE', 'This step is not part of the alpha');
+  }
   if (mode === 'beta' && isLaunchStep(step)) {
     throw new OnboardingError(409, 'ONBOARDING_WRONG_MODE', 'This step is only available after launch');
   }

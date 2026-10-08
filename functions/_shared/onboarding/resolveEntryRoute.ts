@@ -37,6 +37,15 @@ export function resolveEntryRoute(mode: AppMode | null, state: OnboardingSnapsho
 
   const current = state?.currentStep ?? null;
 
+  if (mode === 'alpha') {
+    const step: OnboardingStep = isProfileStep(current)
+      ? current
+      : isBetaStep(current) || isLaunchStep(current)
+        ? 'review'
+        : FIRST_STEP;
+    return { kind: 'onboarding', variant: 'fresh', step };
+  }
+
   if (mode === 'beta') {
     if (state?.betaSignupCompletedAt) return { kind: 'beta_holding' };
     const step: OnboardingStep =
