@@ -97,6 +97,7 @@ crew-up-nhost/
 │   └── oauth-line.ts          # Stub (501)
 └── nhost/
     ├── nhost.toml             # Auth roles, JWT custom claims, services
+    ├── emails/<locale>/       # Auth email templates — generated, see "Auth emails"
     ├── migrations/default/    # MVP schema (no audit_log)
     └── metadata/              # Hasura tables, permissions, actions, triggers
 ```
@@ -168,6 +169,12 @@ Assign staff roles in SQL or dashboard:
 ```sql
 INSERT INTO auth.user_roles (user_id, role) VALUES ('<uuid>', 'staff_admin');
 ```
+
+## Auth emails
+
+Every template in `nhost/emails/<locale>/<template>/` (verify, password reset, email change, magic link, sign-in code) is generated from one layout by `scripts/build-emails.mjs`. Edit the copy or layout there, then run `npm run build:emails`; `npm run check:emails` fails if the files on disk have drifted. Don't edit `body.html` by hand, and don't run the vendored `emails/generator` — it would overwrite them with Nhost's defaults.
+
+The header image loads from `https://crewup.app/email/crewup-wordmark-lime-2x.png`; the source is `nhost/emails/assets/crewup-wordmark-lime-2x.png`. Until it's hosted there, clients show the lime "crewup" alt text instead. Only `en` is sent today (`auth.user.locale.allowed`).
 
 ## GraphQL Actions
 

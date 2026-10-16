@@ -160,9 +160,11 @@ enabled = false
 enabled = false
 
 [auth.method.emailPassword]
-hibpEnabled = false
+# Length and breach check are the only rules Nhost enforces; mixed case, number, symbol
+# and "no name or email" are checked in the app (crew-up-app/lib/password.ts).
+hibpEnabled = true
 emailVerificationRequired = true
-passwordMinLength = 9
+passwordMinLength = 8
 
 [auth.method.smsPasswordless]
 enabled = false
