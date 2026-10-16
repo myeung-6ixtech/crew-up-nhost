@@ -1,0 +1,92 @@
+table:
+  name: event_listings
+  schema: public
+# View over events without notes, venue or address. Private meets are listed to everyone as locked cards.
+object_relationships:
+  - name: creator
+    using:
+      manual_configuration:
+        column_mapping:
+          creator_id: id
+        insertion_order: null
+        remote_table:
+          name: users
+          schema: auth
+array_relationships:
+  - name: attendees
+    using:
+      manual_configuration:
+        column_mapping:
+          id: event_id
+        insertion_order: null
+        remote_table:
+          name: event_attendees
+          schema: public
+  - name: eventActivities
+    using:
+      manual_configuration:
+        column_mapping:
+          id: event_id
+        insertion_order: null
+        remote_table:
+          name: event_activities
+          schema: public
+  - name: unlocks
+    using:
+      manual_configuration:
+        column_mapping:
+          id: event_id
+        insertion_order: null
+        remote_table:
+          name: event_unlocks
+          schema: public
+select_permissions:
+  - role: user
+    permission:
+      columns: '*'
+      filter:
+        _and:
+          - _or:
+              - host_type:
+                  _eq: user
+              - _and:
+                  - host_type:
+                      _eq: platform
+                  - is_published:
+                      _eq: true
+          - _or:
+              - visibility_scope:
+                  _eq: all_verified
+              - visibility_scope:
+                  _eq: friends
+              - _and:
+                  - visibility_scope:
+                      _eq: same_airline
+                  - creator:
+                      profile:
+                        airline_id:
+                          _eq: X-Hasura-Airline-Id
+                  - creator:
+                      profile:
+                        airline_id:
+                          _is_null: false
+              - creator_id:
+                  _eq: X-Hasura-User-Id
+              - attendees:
+                  user_id:
+                    _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true

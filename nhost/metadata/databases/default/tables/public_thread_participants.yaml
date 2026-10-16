@@ -39,6 +39,22 @@ insert_permissions:
         _and:
           - user_id:
               _eq: X-Hasura-User-Id
+          # A meet's chat is for its host and attendees, so a locked private meet can't be read through it.
+          - _or:
+              - thread:
+                  event_id:
+                    _is_null: true
+              - thread:
+                  event:
+                    _or:
+                      - creator_id:
+                          _eq: X-Hasura-User-Id
+                      - attendees:
+                          _and:
+                            - user_id:
+                                _eq: X-Hasura-User-Id
+                            - status:
+                                _neq: removed
           - _exists:
               _table:
                 name: onboarding_state

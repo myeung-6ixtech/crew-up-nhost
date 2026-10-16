@@ -17,6 +17,9 @@ select_permissions:
           _or:
             - visibility_scope:
                 _eq: all_verified
+            # A locked private meet still shows its activities on the list card.
+            - visibility_scope:
+                _eq: friends
             - _and:
                 - visibility_scope:
                     _eq: same_airline

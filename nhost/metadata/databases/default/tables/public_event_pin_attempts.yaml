@@ -1,0 +1,20 @@
+table:
+  name: event_pin_attempts
+  schema: public
+select_permissions:
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+insert_permissions:
+  - role: service
+    permission:
+      check: {}
+      columns:
+        - event_id
+        - user_id
+delete_permissions:
+  - role: service
+    permission:
+      filter: {}

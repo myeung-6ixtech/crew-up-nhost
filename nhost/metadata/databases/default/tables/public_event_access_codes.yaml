@@ -1,0 +1,46 @@
+table:
+  name: event_access_codes
+  schema: public
+object_relationships:
+  - name: event
+    using:
+      foreign_key_constraint_on: event_id
+select_permissions:
+  - role: user
+    permission:
+      columns:
+        - event_id
+        - pin
+        - created_at
+        - rotated_at
+      filter:
+        _and:
+          - event:
+              creator_id:
+                _eq: X-Hasura-User-Id
+          - _exists:
+              _table:
+                name: onboarding_state
+                schema: public
+              _where:
+                _and:
+                  - user_id:
+                      _eq: X-Hasura-User-Id
+                  - onboarding_completed_at:
+                      _is_null: false
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+update_permissions:
+  - role: service
+    permission:
+      columns:
+        - pin
+        - rotated_at
+      filter: {}
+      check: {}
