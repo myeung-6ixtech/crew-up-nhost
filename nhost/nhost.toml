@@ -171,7 +171,8 @@ enabled = false
 
 [auth.method.oauth]
 [auth.method.oauth.apple]
-enabled = true
+# Auth exits on startup if this is enabled while the APPLE_* secrets are empty. Enable once they are set in Nhost Cloud.
+enabled = false
 # Native iOS sign-in sends an identity token whose audience is the bundle id.
 audience = 'com.banamedia.crewup'
 clientId = '{{ secrets.APPLE_SERVICES_ID }}'
