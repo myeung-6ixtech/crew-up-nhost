@@ -23,9 +23,11 @@ object_relationships:
 array_relationships:
   - name: activityPreferences
     using:
-      foreign_key_constraint_on:
-        column: user_id
-        table:
+      manual_configuration:
+        column_mapping:
+          user_id: user_id
+        insertion_order: null
+        remote_table:
           name: profile_activity_preferences
           schema: public
 computed_fields:
