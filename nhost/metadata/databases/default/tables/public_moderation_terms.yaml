@@ -1,0 +1,33 @@
+table:
+  name: moderation_terms
+  schema: public
+select_permissions:
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+  - role: moderator
+    permission:
+      columns: '*'
+      filter: {}
+insert_permissions:
+  - role: staff_admin
+    permission:
+      check: {}
+      columns:
+        - term
+        - lang
+        - severity
+update_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - lang
+        - severity
+      filter: {}
+      check: {}
+delete_permissions:
+  - role: staff_admin
+    permission:
+      filter: {}

@@ -62,6 +62,20 @@ insert_permissions:
                   participants:
                     user_id:
                       _eq: X-Hasura-User-Id
+          - thread:
+              _or:
+                - type:
+                    _neq: direct
+                - _not:
+                    participants:
+                      user:
+                        _or:
+                          - blocks_given:
+                              blocked_id:
+                                _eq: X-Hasura-User-Id
+                          - blocks_received:
+                              blocker_id:
+                                _eq: X-Hasura-User-Id
           - _exists:
               _table:
                 name: onboarding_state
@@ -71,6 +85,8 @@ insert_permissions:
                   - user_id:
                       _eq: X-Hasura-User-Id
                   - onboarding_completed_at:
+                      _is_null: false
+                  - guidelines_accepted_version:
                       _is_null: false
       set:
         sender_id: X-Hasura-User-Id

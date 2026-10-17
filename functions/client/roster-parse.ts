@@ -1,12 +1,13 @@
 import type { Request, Response } from 'express';
-import { badRequest, requireAuthorization, unauthorized } from '../_lib/auth.js';
+import { badRequest, requireUser, unauthorized } from '../_lib/auth.js';
 import { graphqlAsUser } from '../_lib/graphql.js';
 import { RosterImportError } from '../_lib/rosterErrors.js';
 import { extractRosterDuties, rosterLlmConfig, type RosterLlmInput } from '../_lib/rosterLlm.js';
 import { extractPdfText } from '../_lib/rosterPdf.js';
 import { redactRosterText } from '../_lib/rosterRedact.js';
 import { PARSER_VERSION, layoversFromExtraction, tripsFromExtraction } from '../_lib/rosterSchema.js';
-import { downloadFileAsUser } from '../_lib/storage.js';
+import { hasCurrentRosterConsent } from '../_lib/rosterConsent.js';
+import { deleteFileAsAdmin, downloadFileAsUser } from '../_lib/storage.js';
 
 interface ActionPayload {
   action: { name: string };
@@ -72,10 +73,21 @@ async function modelInput(
   throw new RosterImportError('ROSTER_FILE_UNSUPPORTED', `Unsupported type ${mimeType}`, 415);
 }
 
+/** Roster files are deleted as soon as a parse attempt ends (launch-strat Open Item 4); only confirmed trips are kept. */
+async function deleteRosterFile(fileId: string) {
+  try {
+    await deleteFileAsAdmin(fileId);
+  } catch (error) {
+    // The daily purge sweeps any roster file this misses.
+    log('error', 'file_delete_failed', { reason: error instanceof Error ? error.message : 'unknown' });
+  }
+}
+
 export default async function rosterParse(req: Request, res: Response) {
   const startedAt = Date.now();
+  let rosterFileId: string | null = null;
   try {
-    const authorization = requireAuthorization(req);
+    const { authorization, userId } = requireUser(req);
     const payload = req.body as ActionPayload;
     const fileId = payload?.input?.fileId;
 
@@ -105,6 +117,11 @@ export default async function rosterParse(req: Request, res: Response) {
 
     if (file.bucketId !== 'rosters') {
       return badRequest(res, 'File must be uploaded to the rosters bucket');
+    }
+    rosterFileId = file.id;
+
+    if (!(await hasCurrentRosterConsent(userId))) {
+      throw new RosterImportError('ROSTER_CONSENT_REQUIRED', 'No roster AI consent for the current provider', 403);
     }
 
     const config = rosterLlmConfig();
@@ -145,11 +162,13 @@ export default async function rosterParse(req: Request, res: Response) {
       log('warn', 'parse_failed', { code: error.code, reason: error.message, latencyMs: Date.now() - startedAt });
       return rosterError(res, error);
     }
-    if (error instanceof Error && error.message.includes('Authorization')) {
+    if (error instanceof Error && (error.message.includes('Authorization') || error.message === 'Invalid token')) {
       return unauthorized(res);
     }
 
     log('error', 'parse_error', { reason: error instanceof Error ? error.message : 'unknown' });
     return res.status(500).json({ message: 'Failed to parse roster' });
+  } finally {
+    if (rosterFileId) await deleteRosterFile(rosterFileId);
   }
 }

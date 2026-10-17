@@ -327,6 +327,14 @@ export async function writeStep(userId: string, write: StepWrite) {
       if (error instanceof Error && /profiles_username_unique/.test(error.message)) {
         throw new OnboardingError(409, 'ONBOARDING_USERNAME_TAKEN', 'That username is taken', { username: 'That username is taken' });
       }
+      if (error instanceof Error && error.message.includes('CONTENT_BLOCKED')) {
+        const message = "That includes words we don't allow. Edit and try again.";
+        const fields: Record<string, string> = {};
+        if ('username' in write.profile) fields.username = message;
+        if ('full_name' in write.profile || 'full_name_native' in write.profile) fields.fullName = message;
+        if ('preferred_name' in write.profile) fields.preferredName = message;
+        throw new OnboardingError(422, 'CONTENT_BLOCKED', message, fields);
+      }
       throw error;
     }
   }

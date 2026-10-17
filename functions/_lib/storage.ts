@@ -1,6 +1,19 @@
 import { nhostServiceUrl } from './graphql.js';
 import { RosterImportError } from './rosterErrors.js';
 
+/** Deletes a Storage file with the admin secret. A file that is already gone counts as deleted. */
+export async function deleteFileAsAdmin(fileId: string): Promise<void> {
+  const adminSecret = process.env.NHOST_ADMIN_SECRET?.trim();
+  if (!adminSecret) throw new Error('Missing Nhost admin client environment variables');
+  const response = await fetch(`${nhostServiceUrl('storage')}/files/${encodeURIComponent(fileId)}`, {
+    method: 'DELETE',
+    headers: { 'x-hasura-admin-secret': adminSecret },
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Storage delete failed with status ${response.status}`);
+  }
+}
+
 /**
  * Downloads a Storage file with the caller's own token, so bucket permissions
  * decide access exactly as they do for the app.

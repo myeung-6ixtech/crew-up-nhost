@@ -5,8 +5,11 @@ export type AppMode = (typeof APP_MODES)[number];
 /** Bump when steps are added, removed or reordered so clients can handle older in-progress states. */
 export const FLOW_VERSION = 1;
 
-/** Version string stored in `onboarding_state.guidelines_accepted_version`. */
-export const GUIDELINES_VERSION = '2026-09';
+/**
+ * Version string stored in `onboarding_state.guidelines_accepted_version`. Bump when the guidelines or the
+ * Terms of Use change; anyone on an older version sees the acceptance sheet before posting again.
+ */
+export const GUIDELINES_VERSION = '2026-10';
 
 /** Steps 1–7, shared by beta sign-up and standard onboarding. */
 export const PROFILE_STEPS = [

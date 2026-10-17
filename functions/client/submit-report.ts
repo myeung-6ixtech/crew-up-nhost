@@ -5,6 +5,7 @@ import {
   unauthorized,
 } from '../_lib/auth.js';
 import { graphqlAsUser } from '../_lib/graphql.js';
+import { sendStaffAlert } from '../_lib/staffAlert.js';
 
 interface SubmitReportInput {
   reason: string;
@@ -63,6 +64,16 @@ export default async function submitReport(req: Request, res: Response) {
     }
 
     console.info('Moderation ticket created', report.id);
+    const target = input.reportedMessageId ? 'message' : input.reportedEventId ? 'meet' : 'person';
+    // Blocking from a profile files a silent report; those reach the queue without an email.
+    if (input.reason !== 'blocked_from_profile') await sendStaffAlert(
+      `New CrewUp report: ${input.reason} (${target})`,
+      [
+        `Report ${report.id} was filed for a ${target}. Reason: ${input.reason}.`,
+        'Review it in the admin Reports queue. Our published response time is 24 hours.',
+        input.details ? `\nReporter's notes:\n${input.details.slice(0, 1000)}` : '',
+      ].join('\n'),
+    );
 
     return res.status(200).json({
       reportId: report.id,

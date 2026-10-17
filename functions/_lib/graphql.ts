@@ -34,9 +34,10 @@ function describeError(error: GraphqlError): string {
  */
 const LOCAL_SUBDOMAIN_PATTERN = /^(?:(https?):\/\/)?(localhost|local)(?::(\d+))?$/;
 
-type NhostService = 'graphql' | 'storage';
+type NhostService = 'graphql' | 'storage' | 'auth';
 
 const EXPLICIT_URL_ENV: Record<NhostService, string> = {
+  auth: 'NHOST_AUTH_URL',
   graphql: 'NHOST_GRAPHQL_URL',
   storage: 'NHOST_STORAGE_URL',
 };

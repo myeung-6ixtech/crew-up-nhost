@@ -180,7 +180,7 @@ The header image loads from `https://crewup.app/email/crewup-wordmark-lime-2x.pn
 
 | Mutation | Function | Purpose |
 |---|---|---|
-| `parseRoster(fileId: uuid!)` | `/v1/client/roster-parse` | PDF text → redaction → Gemini Flash-Lite → layovers for confirmation |
+| `parseRoster(fileId: uuid!)` | `/v1/client/roster-parse` | Requires current roster AI consent (`ROSTER_CONSENT_REQUIRED` otherwise). PDF text → redaction → Gemini Flash-Lite → layovers for confirmation. The uploaded file is deleted when the call ends; the daily purge cron sweeps roster files older than an hour |
 | `submitReport(...)` | `/v1/client/submit-report` | Create safety report |
 
 Admin portal also calls `POST /v1/admin/events/create` (not a Hasura Action) to create platform-hosted events.
@@ -218,6 +218,8 @@ Cloud: `nhost secrets create|update` per environment.
 |---|---|
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Nhost Auth → Google OAuth provider |
 | `ROSTER_LLM_PROVIDER`, `GEMINI_API_KEY`, `ROSTER_LLM_MODEL`, `ROSTER_LLM_ALLOW_RAW_FILES` | `roster-parse` — see `documentation/features/gemini-flash-lite.md`. Free-tier keys: synthetic rosters only |
+| `ROSTER_AI_PROVIDER_NAME` (optional) | Provider named on the roster AI consent screen (`client/roster/consent`). Changing it, or the provider, asks everyone to consent again |
+| `RESEND_API_KEY`, `STAFF_ALERT_EMAIL`, `STAFF_ALERT_FROM` (optional) | New-report email to the moderation inbox from `submit-report` |
 | `FCM_SERVER_KEY` / `APNS_KEY` | `notification-dispatch` (push stub) |
 | `NHOST_WEBHOOK_SECRET` | Event triggers + cron |
 | `NHOST_ADMIN_SECRET` | Functions → Hasura `service` role |
@@ -267,6 +269,17 @@ nhost secrets create GOOGLE_CLIENT_SECRET --value 'GOCSPX-xxxxxxxx'
 ```
 
 Use separate Google OAuth clients (or separate secret values) per environment (local vs dev vs prod) if redirect URIs differ.
+
+## Sign in with Apple
+
+App Store Guideline 4.8 requires it because the app offers Google. The iOS app signs in natively (`expo-apple-authentication`) and sends Apple's identity token to `/signin/idtoken` with a nonce, so no browser redirect is involved. `nhost.toml` sets `audience` to the bundle id `com.banamedia.crewup`.
+
+1. Apple Developer → **Identifiers**: enable **Sign in with Apple** on the App ID.
+2. **Keys**: create a key with Sign in with Apple and download the `.p8` once.
+3. Optional for web: create a **Services ID** and add the Nhost callback `https://<subdomain>.auth.<region>.nhost.run/v1/signin/provider/apple/callback`.
+4. Set `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_SERVICES_ID` and `APPLE_PRIVATE_KEY` (the `.p8` contents) in `.secrets` locally and with `nhost secrets create` in the cloud. Never paste them into chat or commit them.
+
+Apple may hand out a private-relay email. That's fine: onboarding collects the name and handle, and the relay address still receives mail.
 
 ## Validation
 

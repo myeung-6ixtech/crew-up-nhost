@@ -112,6 +112,24 @@ select_permissions:
               - onboardingState:
                   onboarding_completed_at:
                     _is_null: false
+              - _not:
+                  user:
+                    blocks_given:
+                      blocked_id:
+                        _eq: X-Hasura-User-Id
+              - _not:
+                  user:
+                    blocks_received:
+                      blocker_id:
+                        _eq: X-Hasura-User-Id
+              - _not:
+                  user:
+                    accountDeletion:
+                      _and:
+                        - cancelled_at:
+                            _is_null: true
+                        - purged_at:
+                            _is_null: true
               - _exists:
                   _table:
                     name: onboarding_state

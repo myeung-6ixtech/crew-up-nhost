@@ -13,6 +13,20 @@
     - name: nhost-webhook-secret
       value_from_env: NHOST_WEBHOOK_SECRET
   comment: Daily digest notifications for users with notification_mode=digest
+- name: account_deletion_purge_daily
+  webhook: '{{NHOST_FUNCTIONS_URL}}/internal/account-deletion-purge'
+  schedule: 0 4 * * *
+  include_in_metadata: true
+  payload: {}
+  retry_conf:
+    num_retries: 2
+    retry_interval_seconds: 300
+    timeout_seconds: 300
+    tolerance_seconds: 21600
+  headers:
+    - name: nhost-webhook-secret
+      value_from_env: NHOST_WEBHOOK_SECRET
+  comment: Purge accounts whose 30-day deletion grace period has ended
 - name: flight_schedule_cache_refresh_daily
   webhook: '{{NHOST_FUNCTIONS_URL}}/internal/flight-cache-refresh'
   schedule: 30 3 * * *

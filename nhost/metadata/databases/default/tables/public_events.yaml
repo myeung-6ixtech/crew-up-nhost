@@ -123,6 +123,8 @@ insert_permissions:
                       _eq: X-Hasura-User-Id
                   - onboarding_completed_at:
                       _is_null: false
+                  - guidelines_accepted_version:
+                      _is_null: false
       set:
         creator_id: X-Hasura-User-Id
       columns:

@@ -25,6 +25,16 @@ select_permissions:
                   _neq: off
               - user_id:
                   _neq: X-Hasura-User-Id
+              - _not:
+                  user:
+                    blocks_given:
+                      blocked_id:
+                        _eq: X-Hasura-User-Id
+              - _not:
+                  user:
+                    blocks_received:
+                      blocker_id:
+                        _eq: X-Hasura-User-Id
               - _or:
                   - visibility:
                       _eq: all_verified

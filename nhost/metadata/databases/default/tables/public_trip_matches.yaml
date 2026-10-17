@@ -32,6 +32,16 @@ select_permissions:
         _and:
           - user_id:
               _eq: X-Hasura-User-Id
+          - _not:
+              matchedUser:
+                blocks_given:
+                  blocked_id:
+                    _eq: X-Hasura-User-Id
+          - _not:
+              matchedUser:
+                blocks_received:
+                  blocker_id:
+                    _eq: X-Hasura-User-Id
           - _exists:
               _table:
                 name: onboarding_state

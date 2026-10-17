@@ -5,7 +5,8 @@ export type RosterErrorCode =
   | 'ROSTER_PARSE_INVALID'
   | 'ROSTER_TEXT_UNAVAILABLE'
   | 'ROSTER_FILE_TOO_LARGE'
-  | 'ROSTER_FILE_UNSUPPORTED';
+  | 'ROSTER_FILE_UNSUPPORTED'
+  | 'ROSTER_CONSENT_REQUIRED';
 
 /** Failure with a stable code the app maps to user-facing copy. The message is for logs only. */
 export class RosterImportError extends Error {

@@ -12,6 +12,8 @@ select_permissions:
         - user_id
         - phone_e164
         - phone_verified_at
+        - roster_ai_consent_at
+        - roster_ai_consent_version
         - created_at
         - updated_at
       filter:

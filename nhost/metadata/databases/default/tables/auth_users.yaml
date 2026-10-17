@@ -67,7 +67,32 @@ object_relationships:
         remote_table:
           name: profiles
           schema: public
+  # Used only inside permission filters (pending deletion hides a profile). No role can select account_deletions this way except its owner.
+  - name: accountDeletion
+    using:
+      manual_configuration:
+        column_mapping:
+          id: user_id
+        insertion_order: null
+        remote_table:
+          name: account_deletions
+          schema: public
 array_relationships:
+  # blocks_given / blocks_received back the "neither side has blocked the other" permission filters.
+  - name: blocks_given
+    using:
+      foreign_key_constraint_on:
+        column: blocker_id
+        table:
+          name: user_blocks
+          schema: public
+  - name: blocks_received
+    using:
+      foreign_key_constraint_on:
+        column: blocked_id
+        table:
+          name: user_blocks
+          schema: public
   - name: refreshTokens
     using:
       foreign_key_constraint_on:

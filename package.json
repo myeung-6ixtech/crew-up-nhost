@@ -18,6 +18,8 @@
     "test:roster": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/roster-extraction.test.mjs",
     "test:onboarding": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/onboarding.test.mjs",
     "test:event-pin": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/event-pin.test.mjs",
+    "test:account-deletion": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/account-deletion.test.mjs",
+    "seed:reviewer": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs scripts/seed-demo-reviewer.mjs",
     "sync:shared": "node scripts/sync-shared.mjs",
     "check:shared": "node scripts/sync-shared.mjs --check",
     "build:emails": "node scripts/build-emails.mjs",
