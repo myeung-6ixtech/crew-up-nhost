@@ -50,9 +50,11 @@ name = 'GOOGLE_PLACES_API_KEY'
 value = '{{ secrets.GOOGLE_PLACES_API_KEY }}'
 
 # Onboarding mode (documentation/features/onboarding.md §2). Read only by functions/_lib/appMode.ts.
+# Literal so a deploy does not keep the previous value when the secret was updated after the last deploy.
+# Keep the Nhost Cloud secret CREWUP_APP_MODE the same. An empty env falls back to beta in appMode.ts.
 [[global.environment]]
 name = 'CREWUP_APP_MODE'
-value = '{{ secrets.CREWUP_APP_MODE }}'
+value = 'launched'
 
 [hasura]
 version = 'v2.48.10-ce'
