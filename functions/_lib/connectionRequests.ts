@@ -50,7 +50,7 @@ export async function lookupProfileByFriendId(
     `
       query ProfileByFriendId($friendId: String!) {
         profiles(
-          where: { friend_id: { _eq: $friendId }, is_verified: { _eq: true } }
+          where: { friend_id: { _eq: $friendId } }
           limit: 1
         ) {
           user_id
@@ -89,11 +89,7 @@ export async function lookupProfileByUserId(
     { userId },
   );
 
-  const profile = data.profiles_by_pk;
-  if (!profile?.is_verified) {
-    return null;
-  }
-  return profile;
+  return data.profiles_by_pk;
 }
 
 export async function getPairConnection(

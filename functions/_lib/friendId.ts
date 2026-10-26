@@ -1,11 +1,9 @@
-const FRIEND_ID_PATTERN = /^CREW[0-9A-HJKMNP-TV-Z]{8}$/;
+const FRIEND_ID_BODY = /CREW[0-9A-HJKMNP-TV-Z]{8}/;
 
+/** Pulls a Crew ID out of a typed code or a pasted share message. Dashes and spaces are ignored. */
 export function normalizeFriendId(input: string): string | null {
-  const normalized = input.replace(/[\s-]/g, '').toUpperCase();
-  if (!FRIEND_ID_PATTERN.test(normalized)) {
-    return null;
-  }
-  return normalized;
+  const compact = input.toUpperCase().replace(/[^0-9A-Z]/g, '');
+  return compact.match(FRIEND_ID_BODY)?.[0] ?? null;
 }
 
 export function formatFriendIdForDisplay(friendId: string): string {

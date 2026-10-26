@@ -21,3 +21,10 @@ test('formatFriendIdForDisplay renders grouped code', () => {
 test('normalizeFriendId strips spaces', () => {
   assert.equal(normalizeFriendId('crew 8f2k 9m4x'), 'CREW8F2K9M4X');
 });
+
+test('normalizeFriendId finds the code inside a pasted share message', () => {
+  assert.equal(
+    normalizeFriendId('Add me on CrewUp! My Crew ID is CREW-8F2K-9M4X.'),
+    'CREW8F2K9M4X',
+  );
+});
