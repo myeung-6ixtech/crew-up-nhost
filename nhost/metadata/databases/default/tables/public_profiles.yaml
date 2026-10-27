@@ -107,8 +107,6 @@ select_permissions:
           - user_id:
               _eq: X-Hasura-User-Id
           - _and:
-              - is_verified:
-                  _eq: true
               - user_id:
                   _neq: X-Hasura-User-Id
               - onboardingState:
