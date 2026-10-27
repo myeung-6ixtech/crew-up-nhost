@@ -70,6 +70,12 @@ insert_permissions:
       columns:
         - thread_id
         - user_id
+  - role: service
+    permission:
+      check: {}
+      columns:
+        - thread_id
+        - user_id
 update_permissions:
   - role: user
     permission:

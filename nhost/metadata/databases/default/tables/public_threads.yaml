@@ -52,6 +52,10 @@ select_permissions:
       columns: '*'
       filter: {}
       allow_aggregations: true
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
 insert_permissions:
   - role: user
     permission:
@@ -66,6 +70,12 @@ insert_permissions:
                   _eq: X-Hasura-User-Id
               - onboarding_completed_at:
                   _is_null: false
+      columns:
+        - type
+        - event_id
+  - role: service
+    permission:
+      check: {}
       columns:
         - type
         - event_id
