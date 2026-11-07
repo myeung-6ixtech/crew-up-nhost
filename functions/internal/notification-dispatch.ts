@@ -41,7 +41,7 @@ async function notifyMessageParticipants(message: MessageRow) {
     user_id: userId,
     type: 'message',
     title: 'New message',
-    body: message.body ?? 'You received a new message',
+    body: 'New message',
     payload: {
       thread_id: message.thread_id,
       message_id: message.id,

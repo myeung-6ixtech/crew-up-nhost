@@ -51,8 +51,12 @@ select_permissions:
         - updated_at
         - uploaded_by_user_id
       filter:
-        uploaded_by_user_id:
-          _eq: X-Hasura-User-Id
+        _or:
+          - uploaded_by_user_id:
+              _eq: X-Hasura-User-Id
+          # Profile photos are shown on events, friends, and chat. Other buckets stay private.
+          - bucket_id:
+              _eq: avatars
 insert_permissions:
   - role: user
     permission:

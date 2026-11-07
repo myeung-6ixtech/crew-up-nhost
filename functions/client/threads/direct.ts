@@ -43,6 +43,15 @@ async function findDirectThread(userId: string, otherUserId: string): Promise<st
   return data.threads[0]?.id ?? null;
 }
 
+function directKey(userId: string, otherUserId: string): string {
+  return [userId, otherUserId].sort().join(':');
+}
+
+function isDirectKeyConflict(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return message.includes('threads_direct_key_unique') || message.toLowerCase().includes('uniqueness violation');
+}
+
 async function createDirectThread(userId: string, otherUserId: string): Promise<string> {
   const data = await graphqlRaw<{ insert_threads_one: { id: string } | null }>(
     `
@@ -55,6 +64,7 @@ async function createDirectThread(userId: string, otherUserId: string): Promise<
     {
       object: {
         type: 'direct',
+        direct_key: directKey(userId, otherUserId),
         participants: {
           data: [{ user_id: userId }, { user_id: otherUserId }],
         },
@@ -98,8 +108,17 @@ export default async function openDirectThread(req: Request, res: Response) {
     }
 
     const existing = await findDirectThread(userId, otherUserId);
-    const threadId = existing ?? (await createDirectThread(userId, otherUserId));
-    return res.status(existing ? 200 : 201).json({ thread_id: threadId });
+    if (existing) return res.status(200).json({ thread_id: existing });
+
+    try {
+      const threadId = await createDirectThread(userId, otherUserId);
+      return res.status(201).json({ thread_id: threadId });
+    } catch (error) {
+      if (!isDirectKeyConflict(error)) throw error;
+      const winner = await findDirectThread(userId, otherUserId);
+      if (!winner) throw error;
+      return res.status(200).json({ thread_id: winner });
+    }
   } catch (error) {
     if (error instanceof OnboardingError) return sendOnboardingError(res, error);
     if (error instanceof DirectThreadError) {

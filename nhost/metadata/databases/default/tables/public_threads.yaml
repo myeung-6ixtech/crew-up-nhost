@@ -79,3 +79,4 @@ insert_permissions:
       columns:
         - type
         - event_id
+        - direct_key
