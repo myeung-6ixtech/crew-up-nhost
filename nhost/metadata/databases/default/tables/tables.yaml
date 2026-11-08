@@ -41,3 +41,4 @@
 - "!include public_reports.yaml"
 - "!include public_account_deletions.yaml"
 - "!include public_moderation_terms.yaml"
+- "!include public_media_assets.yaml"

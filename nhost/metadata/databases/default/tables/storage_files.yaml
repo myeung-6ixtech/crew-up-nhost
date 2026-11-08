@@ -57,12 +57,71 @@ select_permissions:
           # Profile photos are shown on events, friends, and chat. Other buckets stay private.
           - bucket_id:
               _eq: avatars
+          # Event featured images and other admin media assets.
+          - bucket_id:
+              _eq: media
+  - role: staff_admin
+    permission:
+      columns:
+        - id
+        - bucket_id
+        - mime_type
+        - is_uploaded
+      filter:
+        bucket_id:
+          _in:
+            - avatars
+            - media
+  - role: moderator
+    permission:
+      columns:
+        - id
+        - bucket_id
+        - mime_type
+        - is_uploaded
+      filter:
+        bucket_id:
+          _in:
+            - avatars
+            - media
 insert_permissions:
   - role: user
     permission:
       check:
         uploaded_by_user_id:
           _eq: X-Hasura-User-Id
+      set:
+        uploaded_by_user_id: X-Hasura-User-Id
+      columns:
+        - id
+        - bucket_id
+        - name
+        - size
+        - mime_type
+        - etag
+        - is_uploaded
+        - metadata
+  - role: staff_admin
+    permission:
+      check:
+        bucket_id:
+          _eq: media
+      set:
+        uploaded_by_user_id: X-Hasura-User-Id
+      columns:
+        - id
+        - bucket_id
+        - name
+        - size
+        - mime_type
+        - etag
+        - is_uploaded
+        - metadata
+  - role: moderator
+    permission:
+      check:
+        bucket_id:
+          _eq: media
       set:
         uploaded_by_user_id: X-Hasura-User-Id
       columns:

@@ -1,0 +1,55 @@
+table:
+  name: media_assets
+  schema: public
+select_permissions:
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+  - role: moderator
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+insert_permissions:
+  - role: staff_admin
+    permission:
+      check: {}
+      set:
+        uploaded_by_user_id: X-Hasura-User-Id
+      columns:
+        - file_id
+        - sha256
+        - content_type
+        - size_bytes
+        - width
+        - height
+        - original_filename
+  - role: moderator
+    permission:
+      check: {}
+      set:
+        uploaded_by_user_id: X-Hasura-User-Id
+      columns:
+        - file_id
+        - sha256
+        - content_type
+        - size_bytes
+        - width
+        - height
+        - original_filename
+update_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - deleted_at
+      filter: {}
+      check: {}
+  - role: moderator
+    permission:
+      columns:
+        - deleted_at
+      filter: {}
+      check: {}
+delete_permissions: []

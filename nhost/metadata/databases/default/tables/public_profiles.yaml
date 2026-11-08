@@ -213,8 +213,18 @@ update_permissions:
   - role: staff_admin
     permission:
       columns:
-        - is_verified
+        - display_name
+        - full_name
+        - full_name_native
+        - preferred_name
+        - username
         - airline_id
+        - base_airport
+        - base_airport_iata
+        - role_type
+        - crew_role
+        - rank
+        - is_verified
       filter: {}
       check: {}
   - role: service

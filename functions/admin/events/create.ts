@@ -20,6 +20,7 @@ interface CreatePlatformEventBody {
   tags?: string[];
   is_published?: boolean;
   featured_until?: string | null;
+  featured_image_file_id?: string | null;
 }
 
 function parseBody(body: unknown): CreatePlatformEventBody {
@@ -56,6 +57,8 @@ function parseBody(body: unknown): CreatePlatformEventBody {
       : [],
     is_published: typeof input.is_published === 'boolean' ? input.is_published : true,
     featured_until: typeof input.featured_until === 'string' ? input.featured_until : null,
+    featured_image_file_id:
+      typeof input.featured_image_file_id === 'string' ? input.featured_image_file_id : null,
   };
 }
 
@@ -97,6 +100,7 @@ export default async function createPlatformEvent(req: Request, res: Response) {
           is_published: input.is_published ?? true,
           published_at: publishedAt,
           featured_until: input.featured_until,
+          featured_image_file_id: input.featured_image_file_id,
         },
       },
       'staff_admin',

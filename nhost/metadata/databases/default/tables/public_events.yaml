@@ -162,6 +162,7 @@ insert_permissions:
         - is_published
         - published_at
         - featured_until
+        - featured_image_file_id
 update_permissions:
   - role: user
     permission:
@@ -232,6 +233,7 @@ update_permissions:
         - is_published
         - published_at
         - featured_until
+        - featured_image_file_id
       filter:
         host_type:
           _eq: platform
