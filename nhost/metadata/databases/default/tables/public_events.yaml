@@ -139,6 +139,7 @@ insert_permissions:
         - visibility_scope
         - tags
         - languages
+        - featured_image_file_id
   - role: staff_admin
     permission:
       check:
@@ -180,6 +181,7 @@ update_permissions:
         - languages
         - rsvp_closed_at
         - cancelled_at
+        - featured_image_file_id
       filter:
         _and:
           - _and:
