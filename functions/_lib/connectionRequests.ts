@@ -1,5 +1,6 @@
 import { graphqlRaw } from './graphql.js';
 import { normalizeFriendId } from './friendId.js';
+import { recomputeMatchesForUsers } from './tripMatching.js';
 
 export { formatFriendIdForDisplay, normalizeFriendId } from './friendId.js';
 
@@ -243,6 +244,9 @@ export async function sendConnectionRequest(input: {
       throw new ConnectionRequestError('REQUEST_FAILED', 'Failed to accept connection', 500);
     }
 
+    void recomputeMatchesForUsers([requesterId, addresseeId]).catch((error) => {
+      console.error('connectionRequests: layover rematch failed', error);
+    });
     return { connection, outcome: 'accepted' };
   }
 

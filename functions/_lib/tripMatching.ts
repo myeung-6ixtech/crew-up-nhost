@@ -37,14 +37,18 @@ interface CandidateTrip {
   isVerified: boolean;
 }
 
+type ProfileRow = {
+  user_id: string;
+  airline_id: string | null;
+  is_verified: boolean;
+  default_visibility: string;
+};
+
 type TripRow = {
   id: string;
   user_id: string;
   visibility: string | null;
   is_active: boolean;
-  user: {
-    profile: { airline_id: string | null; is_verified: boolean; default_visibility: string } | null;
-  } | null;
   flightLegs: Array<{
     flight_instance_id: string;
     flight: {
@@ -64,8 +68,7 @@ type TripRow = {
   }>;
 };
 
-function toTripContext(trip: TripRow): TripContext {
-  const profile = trip.user?.profile;
+function toTripContext(trip: TripRow, profile: ProfileRow | null): TripContext {
   const effectiveVisibility = normalizeVisibilityForAffiliation(
     trip.visibility ?? profile?.default_visibility ?? 'friends',
     profile?.airline_id,
@@ -101,13 +104,6 @@ const TRIP_CONTEXT_FIELDS = `
   user_id
   visibility
   is_active
-  user {
-    profile {
-      airline_id
-      is_verified
-      default_visibility
-    }
-  }
   flightLegs {
     flight_instance_id
     flight {
@@ -142,8 +138,26 @@ async function loadTripContexts(tripIds: string[]): Promise<Map<string, TripCont
     { ids: tripIds },
   );
 
+  const userIds = [...new Set(data.user_trips.map((trip) => trip.user_id))];
+  const profiles = userIds.length
+    ? await graphqlRaw<{ profiles: ProfileRow[] }>(
+        `
+          query TripProfiles($userIds: [uuid!]!) {
+            profiles(where: { user_id: { _in: $userIds } }) {
+              user_id
+              airline_id
+              is_verified
+              default_visibility
+            }
+          }
+        `,
+        { userIds },
+      )
+    : { profiles: [] };
+  const profileByUser = new Map(profiles.profiles.map((profile) => [profile.user_id, profile]));
+
   for (const trip of data.user_trips) {
-    trips.set(trip.id, toTripContext(trip));
+    trips.set(trip.id, toTripContext(trip, profileByUser.get(trip.user_id) ?? null));
   }
   return trips;
 }
@@ -224,22 +238,50 @@ function canDiscover(
 ): boolean {
   if (viewer.visibility === 'off' || target.visibility === 'off') return false;
 
-  if (viewer.visibility === 'all_verified' || target.visibility === 'all_verified') {
-    return viewer.isVerified && target.isVerified;
+  const connected = viewerFriends.has(target.userId) || targetFriends.has(viewer.userId);
+  // A friend can see a shared layover even when the wider audience still expects a verification badge.
+  if (connected) return true;
+
+  if (
+    viewer.visibility === 'friends' ||
+    target.visibility === 'friends' ||
+    viewer.visibility === 'friends_of_friends' ||
+    target.visibility === 'friends_of_friends'
+  ) {
+    return false;
   }
 
   if (viewer.visibility === 'same_airline' || target.visibility === 'same_airline') {
-    if (!viewer.airlineId || !target.airlineId || viewer.airlineId !== target.airlineId) {
-      return false;
-    }
-    return viewer.isVerified && target.isVerified;
+    return Boolean(viewer.airlineId && target.airlineId && viewer.airlineId === target.airlineId);
   }
 
-  if (viewer.visibility === 'friends' || target.visibility === 'friends') {
-    return viewerFriends.has(target.userId) || targetFriends.has(viewer.userId);
-  }
+  // all_verified and any other open audience. The verification gate is off, so the badge is not required.
+  return true;
+}
 
-  return viewer.isVerified && target.isVerified;
+function samePlace(
+  source: TripContext['stays'][number],
+  target: TripContext['stays'][number],
+): boolean {
+  if (source.city.trim().toLowerCase() === target.city.trim().toLowerCase()) return true;
+  const codes = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    const code = value?.trim().toUpperCase();
+    if (code && /^[A-Z]{3}$/.test(code)) codes.add(code);
+  };
+  add(source.airportIata);
+  add(source.city);
+  const targetCodes = new Set<string>();
+  const addTarget = (value: string | null | undefined) => {
+    const code = value?.trim().toUpperCase();
+    if (code && /^[A-Z]{3}$/.test(code)) targetCodes.add(code);
+  };
+  addTarget(target.airportIata);
+  addTarget(target.city);
+  for (const code of codes) {
+    if (targetCodes.has(code)) return true;
+  }
+  return false;
 }
 
 function overlapMs(aStart: string, aEnd: string, bStart: string, bEnd: string): number {
@@ -314,7 +356,18 @@ function matchRow(input: {
   };
 }
 
+function dedupeMatchRows(rows: MatchInsert[]): MatchInsert[] {
+  const byKey = new Map<string, MatchInsert>();
+  for (const row of rows) {
+    const key = [row.user_id, row.matched_user_id, row.match_type, row.source_trip_id, row.matched_trip_id].join(':');
+    const existing = byKey.get(key);
+    if (!existing || row.score > existing.score) byKey.set(key, row);
+  }
+  return [...byKey.values()];
+}
+
 async function insertMatches(objects: MatchInsert[]): Promise<number> {
+  objects = dedupeMatchRows(objects);
   if (!objects.length) return 0;
   await graphqlRaw(
     `
@@ -392,11 +445,23 @@ export async function recomputeTripMatches(tripId: string): Promise<{
       `,
       {
         tripId: source.id,
-        windows: source.stays.map((stay) => ({
-          city: { _ilike: stay.city },
-          starts_at: { _lte: stay.endsAt },
-          ends_at: { _gte: stay.startsAt },
-        })),
+        windows: source.stays.flatMap((stay) => {
+          const time = {
+            starts_at: { _lte: stay.endsAt },
+            ends_at: { _gte: stay.startsAt },
+          };
+          const windows: Array<Record<string, unknown>> = [{ city: { _ilike: stay.city }, ...time }];
+          const codes = new Set<string>();
+          if (/^[A-Za-z]{3}$/.test(stay.city.trim())) codes.add(stay.city.trim().toUpperCase());
+          if (stay.airportIata && /^[A-Za-z]{3}$/.test(stay.airportIata.trim())) {
+            codes.add(stay.airportIata.trim().toUpperCase());
+          }
+          for (const code of codes) {
+            windows.push({ city: { _ilike: code }, ...time });
+            windows.push({ airport_iata: { _eq: code }, ...time });
+          }
+          return windows;
+        }),
       },
     );
     for (const row of overlap.trip_stays) candidateTripIds.add(row.trip_id);
@@ -463,7 +528,7 @@ export async function recomputeTripMatches(tripId: string): Promise<{
 
     for (const sourceStay of source.stays) {
       for (const targetStay of target.stays) {
-        if (sourceStay.city.toLowerCase() !== targetStay.city.toLowerCase()) continue;
+        if (!samePlace(sourceStay, targetStay)) continue;
         const overlap = overlapMs(
           sourceStay.startsAt,
           sourceStay.endsAt,
@@ -520,4 +585,26 @@ export async function recomputeTripMatches(tripId: string): Promise<{
 
   const insertedMatches = await insertMatches(rows);
   return { deletedMatches, insertedMatches };
+}
+
+/** Rebuild matches for every active trip belonging to these people. */
+export async function recomputeMatchesForUsers(userIds: string[]): Promise<number> {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (!ids.length) return 0;
+  const data = await graphqlRaw<{ user_trips: Array<{ id: string }> }>(
+    `
+      query ActiveTripsForUsers($userIds: [uuid!]!) {
+        user_trips(where: { is_active: { _eq: true }, user_id: { _in: $userIds } }) {
+          id
+        }
+      }
+    `,
+    { userIds: ids },
+  );
+  let inserted = 0;
+  for (const trip of data.user_trips) {
+    const result = await recomputeTripMatches(trip.id);
+    inserted += result.insertedMatches;
+  }
+  return inserted;
 }

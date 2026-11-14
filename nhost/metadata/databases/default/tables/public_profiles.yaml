@@ -66,6 +66,12 @@ computed_fields:
         schema: public
       session_argument: hasura_session
     comment: show_gender for the caller's own row; null for everyone else
+  - name: onboarding_completed
+    definition:
+      function:
+        name: profile_onboarding_completed
+        schema: public
+    comment: true when this member finished onboarding; does not expose the onboarding row
 select_permissions:
   - role: user
     permission:
@@ -102,6 +108,7 @@ select_permissions:
         - own_hometown_longitude
         - visible_gender
         - own_show_gender
+        - onboarding_completed
       filter:
         _or:
           - user_id:
@@ -109,9 +116,8 @@ select_permissions:
           - _and:
               - user_id:
                   _neq: X-Hasura-User-Id
-              - onboardingState:
-                  onboarding_completed_at:
-                    _is_null: false
+              - onboarding_completed:
+                  _eq: true
               - _not:
                   user:
                     blocks_given:
