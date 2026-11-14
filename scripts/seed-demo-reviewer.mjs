@@ -84,7 +84,7 @@ const PEOPLE = {
       date_of_birth: '1994-09-03',
       home_country_code: 'HK',
       hometown_city: 'Hong Kong',
-      languages: ['en', 'zh'],
+      languages: ['en', 'yue'],
       residence_country_code: 'HK',
       residence_city: 'Hong Kong',
       crew_role: 'cabin_crew',
