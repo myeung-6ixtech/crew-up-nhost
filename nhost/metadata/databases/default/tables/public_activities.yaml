@@ -41,6 +41,7 @@ select_permissions:
         - is_active
         - kind
         - parent_id
+        - show_in_onboarding
       filter:
         is_active:
           _eq: true
@@ -57,6 +58,7 @@ select_permissions:
         - is_active
         - kind
         - parent_id
+        - show_in_onboarding
       filter:
         is_active:
           _eq: true
@@ -79,6 +81,7 @@ insert_permissions:
         - is_active
         - kind
         - parent_id
+        - show_in_onboarding
 update_permissions:
   - role: staff_admin
     permission:
@@ -92,6 +95,7 @@ update_permissions:
         - is_active
         - kind
         - parent_id
+        - show_in_onboarding
       filter: {}
       check: {}
 delete_permissions: []
