@@ -1,0 +1,38 @@
+table:
+  name: admin_mcp_keys
+  schema: public
+select_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - id
+        - user_id
+        - name
+        - created_at
+        - revoked_at
+        - last_used_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      allow_aggregations: true
+insert_permissions:
+  - role: staff_admin
+    permission:
+      check: {}
+      set:
+        user_id: X-Hasura-User-Id
+      columns:
+        - name
+        - key_sha256
+        - refresh_token
+update_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - revoked_at
+      filter:
+        user_id:
+          _eq: X-Hasura-User-Id
+      check:
+        user_id:
+          _eq: X-Hasura-User-Id

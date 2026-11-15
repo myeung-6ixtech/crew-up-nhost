@@ -1,0 +1,25 @@
+table:
+  name: admin_mcp_settings
+  schema: public
+select_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - id
+        - enabled
+        - updated_at
+      filter: {}
+  - role: moderator
+    permission:
+      columns:
+        - id
+        - enabled
+        - updated_at
+      filter: {}
+update_permissions:
+  - role: staff_admin
+    permission:
+      columns:
+        - enabled
+      filter: {}
+      check: {}
