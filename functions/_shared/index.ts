@@ -5,3 +5,4 @@ export * from './schemas/onboarding.js';
 export * from './reference/countries.js';
 export * from './reference/languages.js';
 export * from './reference/reservedUsernames.js';
+export * from './activities/catalog.js';
