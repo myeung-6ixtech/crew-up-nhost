@@ -15,6 +15,22 @@ SET name = 'Food'
 WHERE slug = 'food_drink'
   AND parent_id IS NULL;
 
+-- "Drinks" already exists as a Nightlife child. A group cannot share that slug,
+-- and a child cannot be promoted while profiles or events still point at it.
+DELETE FROM public.profile_activity_preferences
+WHERE activity_id IN (
+  SELECT id FROM public.activities WHERE slug = 'drinks' AND parent_id IS NOT NULL
+);
+
+DELETE FROM public.event_activities
+WHERE activity_id IN (
+  SELECT id FROM public.activities WHERE slug = 'drinks' AND parent_id IS NOT NULL
+);
+
+DELETE FROM public.activities
+WHERE slug = 'drinks'
+  AND parent_id IS NOT NULL;
+
 INSERT INTO public.activities (slug, name, category, sort_order, kind, is_active)
 SELECT groups.slug, groups.name, groups.slug, groups.sort_order, 'activity', true
 FROM (VALUES
