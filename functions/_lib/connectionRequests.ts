@@ -194,12 +194,42 @@ async function insertConnectionNotification(input: {
   );
 }
 
+export type WaveMeta = {
+  overlap_key: string;
+  city?: string;
+  match_type?: string;
+  overlap_start?: string;
+  overlap_end?: string;
+  flight_number?: string;
+};
+
+function clip(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+/** Layover snapshot stored on a wave request. Anything else is dropped. */
+export function cleanWaveMeta(value: unknown): WaveMeta | null {
+  if (!value || typeof value !== 'object') return null;
+  const raw = value as Record<string, unknown>;
+  const overlap_key = clip(raw.overlap_key, 200);
+  if (!overlap_key) return null;
+  return {
+    overlap_key,
+    city: clip(raw.city, 80),
+    match_type: clip(raw.match_type, 40),
+    overlap_start: clip(raw.overlap_start, 40),
+    overlap_end: clip(raw.overlap_end, 40),
+    flight_number: clip(raw.flight_number, 20),
+  };
+}
+
 export async function sendConnectionRequest(input: {
   requesterId: string;
   addresseeId: string;
   message?: string | null;
+  waveMeta?: WaveMeta | null;
 }): Promise<{ connection: ConnectionRow; outcome: ConnectionRequestOutcome }> {
-  const { requesterId, addresseeId, message } = input;
+  const { requesterId, addresseeId, message, waveMeta } = input;
 
   if (requesterId === addresseeId) {
     throw new ConnectionRequestError('SELF_INVITE', 'You cannot send a request to yourself', 400);
@@ -267,6 +297,7 @@ export async function sendConnectionRequest(input: {
         addressee_id: addresseeId,
         status: 'pending',
         message: message?.trim() || null,
+        wave_meta: waveMeta ?? null,
       },
     },
   );

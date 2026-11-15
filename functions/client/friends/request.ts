@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { OnboardingError, assertOnboarded, sendOnboardingError } from '../../_lib/onboarding.js';
 import { badRequest, requireUser, unauthorized } from '../../_lib/auth.js';
 import {
+  cleanWaveMeta,
   ConnectionRequestError,
   lookupProfileByFriendId,
   normalizeFriendId,
@@ -21,6 +22,7 @@ export default async function friendsRequest(req: Request, res: Response) {
     await assertOnboarded(userId);
     const body = req.body as Record<string, unknown>;
     const message = typeof body.message === 'string' ? body.message : undefined;
+    const waveMeta = cleanWaveMeta(body.wave_meta);
     const addresseeIdInput = typeof body.addressee_id === 'string' ? body.addressee_id : '';
     const friendIdInput = typeof body.friend_id === 'string' ? body.friend_id : '';
 
@@ -50,6 +52,7 @@ export default async function friendsRequest(req: Request, res: Response) {
       requesterId: userId,
       addresseeId,
       message,
+      waveMeta,
     });
 
     const statusCode =

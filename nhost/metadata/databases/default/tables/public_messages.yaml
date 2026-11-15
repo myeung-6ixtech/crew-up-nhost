@@ -94,3 +94,5 @@ insert_permissions:
         - thread_id
         - body
         - media_file_id
+        - kind
+        - meta
