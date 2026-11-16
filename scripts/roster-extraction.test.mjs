@@ -421,3 +421,66 @@ test('openrouter error text that looks like a roster is not kept', async (t) => 
     message: 'OpenRouter request failed with status 403',
   });
 });
+
+// Retry policy: the function makes one attempt and says whether the app may try the same file again.
+const useOpenRouter = () => {
+  process.env.ROSTER_LLM_PROVIDER = 'openrouter';
+  process.env.OPENROUTER_API_KEY = 'or-test';
+  process.env.ROSTER_LLM_MODELS = 'first:free';
+};
+
+for (const status of [408, 429, 500, 502, 503, 504]) {
+  test(`openrouter ${status} is retryable, from a single request`, async (t) => {
+    useOpenRouter();
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => {
+      calls += 1;
+      return new Response('{}', { status, headers: status === 503 ? { 'retry-after': '3' } : {} });
+    });
+    await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), (error) => {
+      assert.equal(error.retryable, true);
+      assert.equal(error.statusCode, 422);
+      assert.equal(error.providerStatus, status);
+      if (status === 503) assert.equal(error.retryAfterSeconds, 3);
+      return true;
+    });
+    assert.equal(calls, 1);
+  });
+}
+
+for (const [status, code] of [
+  [400, 'ROSTER_PARSER_UNAVAILABLE'],
+  [401, 'ROSTER_PARSER_UNAVAILABLE'],
+  [403, 'ROSTER_PARSER_UNAVAILABLE'],
+  [413, 'ROSTER_FILE_TOO_LARGE'],
+]) {
+  test(`openrouter ${status} is not retryable`, async (t) => {
+    useOpenRouter();
+    t.mock.method(globalThis, 'fetch', async () => new Response('{}', { status }));
+    await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), (error) => {
+      assert.equal(error.code, code);
+      assert.equal(error.retryable, false);
+      return true;
+    });
+  });
+}
+
+test('an error object inside a 200 response is a retryable failure, not an empty extraction', async (t) => {
+  useOpenRouter();
+  t.mock.method(globalThis, 'fetch', async () =>
+    new Response(JSON.stringify({ error: { code: 502, message: 'Upstream provider error' } }), { status: 200 }),
+  );
+  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), (error) => {
+    assert.equal(error.retryable, true);
+    assert.equal(error.providerStatus, 502);
+    return true;
+  });
+});
+
+test('a dropped connection is retryable', async (t) => {
+  useOpenRouter();
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new TypeError('fetch failed');
+  });
+  await assert.rejects(extractRosterDuties({ kind: 'text', text: 'x' }), { code: 'ROSTER_PARSER_TIMEOUT', retryable: true });
+});

@@ -34,12 +34,33 @@ function log(level: 'info' | 'warn' | 'error', event: string, details: Record<st
   console[level](JSON.stringify({ scope: 'client/roster-parse', event, ...details }));
 }
 
-/** Hasura surfaces `message` and `extensions` from a non-2xx action response as the GraphQL error. */
+/**
+ * Hasura surfaces `message` and `extensions` from a non-2xx action response as the GraphQL error. `retryable` and
+ * `retryAfterSeconds` drive the app's retry loop; the app never shows the message or a status to the user.
+ */
 function rosterError(res: Response, error: RosterImportError) {
   return res.status(error.statusCode).json({
     message: error.message,
-    extensions: { code: error.code },
+    extensions: { code: error.code, retryable: error.retryable, retryAfterSeconds: error.retryAfterSeconds },
   });
+}
+
+/** Sent by the app on every attempt of one read, and forwarded by the action (forward_client_headers). */
+function readContext(req: Request) {
+  const header = (name: string) => {
+    const value = req.headers[name];
+    return typeof value === 'string' ? value.slice(0, 64) : null;
+  };
+  const number = (name: string) => {
+    const value = Number(header(name));
+    return header(name) !== null && Number.isFinite(value) ? value : null;
+  };
+  return {
+    requestId: header('x-crewup-read-id'),
+    attempt: number('x-crewup-read-attempt'),
+    /** Time since the read started on the phone, so the last attempt's log shows the read's total time. */
+    readElapsedMs: number('x-crewup-read-elapsed-ms'),
+  };
 }
 
 async function modelInput(
@@ -85,6 +106,7 @@ async function deleteRosterFile(fileId: string) {
 
 export default async function rosterParse(req: Request, res: Response) {
   const startedAt = Date.now();
+  const { requestId, attempt, readElapsedMs } = readContext(req);
   let rosterFileId: string | null = null;
   try {
     const { authorization, userId } = requireUser(req);
@@ -154,12 +176,25 @@ export default async function rosterParse(req: Request, res: Response) {
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       latencyMs: Date.now() - startedAt,
+      requestId,
+      attempt,
+      readElapsedMs,
     });
 
     return res.status(200).json({ sourceFileId: file.id, entries, homeBase, trips, skippedDuties });
   } catch (error) {
     if (error instanceof RosterImportError) {
-      log('warn', 'parse_failed', { code: error.code, reason: error.message, latencyMs: Date.now() - startedAt });
+      log('warn', 'parse_failed', {
+        code: error.code,
+        reason: error.message,
+        providerStatus: error.providerStatus,
+        retryable: error.retryable,
+        retryAfterSeconds: error.retryAfterSeconds,
+        latencyMs: Date.now() - startedAt,
+        requestId,
+        attempt,
+        readElapsedMs,
+      });
       return rosterError(res, error);
     }
     if (error instanceof Error && (error.message.includes('Authorization') || error.message === 'Invalid token')) {
