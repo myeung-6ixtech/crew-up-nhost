@@ -7,6 +7,7 @@ import {
   type HasuraEventPayload,
   type MessageRow,
 } from '../_lib/auth.js';
+import { sendPushNotices } from '../_lib/expoPush.js';
 import { graphqlRaw } from '../_lib/graphql.js';
 
 interface ThreadParticipants {
@@ -61,8 +62,21 @@ async function notifyMessageParticipants(message: MessageRow) {
     { objects },
   );
 
-  if (process.env.FCM_SERVER_KEY || process.env.APNS_KEY) {
-    console.info('Push dispatch stub: would send to', recipients.length, 'users');
+  try {
+    await sendPushNotices(
+      objects.map((object) => ({
+        userId: object.user_id,
+        title: object.title,
+        body: object.body,
+        data: {
+          type: 'message',
+          threadId: message.thread_id,
+          url: `crewup://messages/${message.thread_id}`,
+        },
+      })),
+    );
+  } catch (error) {
+    console.error('notification-dispatch: push failed', error);
   }
 
   return { inserted: result.insert_notifications.affected_rows };
@@ -120,6 +134,20 @@ async function runDigestBatch() {
         },
       },
     );
+
+    try {
+      await sendPushNotices([
+        {
+          userId: profile.user_id,
+          title: 'Your CrewUp digest',
+          body: `You have ${unread.notifications.length} unread notifications`,
+          data: { type: 'beacon', url: 'crewup://messages' },
+          includeDigest: true,
+        },
+      ]);
+    } catch (error) {
+      console.error('notification-dispatch: digest push failed', error);
+    }
 
     inserted += 1;
   }

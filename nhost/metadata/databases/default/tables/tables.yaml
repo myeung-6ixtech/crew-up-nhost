@@ -38,6 +38,7 @@
 - "!include public_thread_participants.yaml"
 - "!include public_messages.yaml"
 - "!include public_notifications.yaml"
+- "!include public_push_tokens.yaml"
 - "!include public_reports.yaml"
 - "!include public_account_deletions.yaml"
 - "!include public_admin_mcp_keys.yaml"

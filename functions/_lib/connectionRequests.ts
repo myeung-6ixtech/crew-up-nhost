@@ -1,3 +1,4 @@
+import { sendPushNotices } from './expoPush.js';
 import { graphqlRaw } from './graphql.js';
 import { normalizeFriendId } from './friendId.js';
 import { recomputeMatchesForUsers } from './tripMatching.js';
@@ -314,6 +315,19 @@ export async function sendConnectionRequest(input: {
       requesterId,
       message,
     });
+    await sendPushNotices([
+      {
+        userId: addresseeId,
+        title: 'Connection request',
+        body: 'Someone wants to connect',
+        data: {
+          type: 'connection_request',
+          connectionId: connection.id,
+          requesterId,
+          url: `crewup://network/${requesterId}`,
+        },
+      },
+    ]);
   } catch (error) {
     console.error('connectionRequests: notification insert failed', error);
   }

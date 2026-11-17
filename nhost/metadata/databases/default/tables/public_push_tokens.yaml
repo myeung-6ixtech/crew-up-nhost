@@ -1,0 +1,29 @@
+table:
+  name: push_tokens
+  schema: public
+select_permissions:
+  - role: staff_admin
+    permission:
+      columns: '*'
+      filter: {}
+      allow_aggregations: true
+  - role: service
+    permission:
+      columns: '*'
+      filter: {}
+insert_permissions:
+  - role: service
+    permission:
+      check: {}
+      columns: '*'
+update_permissions:
+  - role: service
+    permission:
+      columns:
+        - user_id
+        - platform
+        - is_active
+        - last_seen_at
+      filter: {}
+      check: {}
+delete_permissions: []
