@@ -4,8 +4,11 @@ import { badRequest, requireUser, unauthorized } from '../../_lib/auth.js';
 import {
   ConnectionRequestError,
   formatFriendIdForDisplay,
+  getPairConnection,
+  isBlockedBetween,
   lookupProfileByFriendId,
   normalizeFriendId,
+  relationshipFrom,
 } from '../../_lib/connectionRequests.js';
 
 export default async function friendsLookup(req: Request, res: Response) {
@@ -37,13 +40,25 @@ export default async function friendsLookup(req: Request, res: Response) {
       });
     }
 
+    // A block either way: the code can't be used, and nothing about the person is returned.
+    if (profile.user_id !== userId && (await isBlockedBetween(userId, profile.user_id))) {
+      return res.status(403).json({ error: { code: 'BLOCKED', message: 'This code can\'t be used' } });
+    }
+    const relationship = relationshipFrom(userId, profile.user_id, profile.user_id === userId ? null : await getPairConnection(userId, profile.user_id));
+
     return res.status(200).json({
+      relationship,
       profile: {
         user_id: profile.user_id,
         display_name: profile.display_name,
+        preferred_name: profile.preferred_name ?? null,
+        crew_role: profile.crew_role ?? null,
+        airline_id: profile.airline_id ?? null,
         role_type: profile.role_type ?? null,
         base_airport: profile.base_airport ?? null,
+        base_airport_iata: profile.base_airport_iata ?? null,
         avatar_file_id: profile.avatar_file_id ?? null,
+        // The caller already has this code (they typed or scanned it); it's echoed for the Crew ID search.
         friend_id: profile.friend_id,
         friend_id_display: formatFriendIdForDisplay(profile.friend_id),
       },

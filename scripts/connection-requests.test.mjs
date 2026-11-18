@@ -28,3 +28,23 @@ test('normalizeFriendId finds the code inside a pasted share message', () => {
     'CREW8F2K9M4X',
   );
 });
+
+const { pokeBody, pokeSenderName, POKE_TITLE } = await import('../functions/_lib/pokeNotice.ts');
+
+test('poke notifications name who poked and where', () => {
+  assert.equal(POKE_TITLE, 'Poke');
+  assert.equal(pokeBody(pokeSenderName({ preferred_name: 'Sam', display_name: 'Samuel Lee' }), { city: 'Tokyo' }), 'Sam poked you · Tokyo layover');
+  assert.equal(pokeBody(pokeSenderName({ display_name: 'Gerry Kuo' }), null), 'Gerry poked you');
+  assert.equal(pokeBody(pokeSenderName(null), { city: '  ' }), 'A crew member poked you');
+});
+
+const { relationshipFrom } = await import('../functions/_lib/relationship.ts');
+
+test('QR Add friend: relationship from the viewer’s side', () => {
+  assert.equal(relationshipFrom('me', 'me', null), 'self');
+  assert.equal(relationshipFrom('me', 'them', null), 'none');
+  assert.equal(relationshipFrom('me', 'them', { status: 'accepted', requester_id: 'them' }), 'friends');
+  assert.equal(relationshipFrom('me', 'them', { status: 'pending', requester_id: 'me' }), 'pending_sent');
+  assert.equal(relationshipFrom('me', 'them', { status: 'pending', requester_id: 'them' }), 'pending_received');
+  assert.equal(relationshipFrom('me', 'them', { status: 'declined', requester_id: 'them' }), 'none');
+});

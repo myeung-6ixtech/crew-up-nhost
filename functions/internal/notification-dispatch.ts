@@ -9,6 +9,8 @@ import {
 } from '../_lib/auth.js';
 import { sendPushNotices } from '../_lib/expoPush.js';
 import { graphqlRaw } from '../_lib/graphql.js';
+import { lookupSenderName } from '../_lib/connectionRequests.js';
+import { POKE_TITLE, pokeBody, pokeSenderName } from '../_lib/pokeNotice.js';
 
 interface ThreadParticipants {
   thread_participants: Array<{ user_id: string }>;
@@ -38,16 +40,20 @@ async function notifyMessageParticipants(message: MessageRow) {
     return { inserted: 0 };
   }
 
-  const wave = (message as MessageRow & { kind?: string }).kind === 'wave';
+  const row = message as MessageRow & { kind?: string; meta?: { city?: string | null } | null };
+  const wave = row.kind === 'wave';
+  // A poke between friends names who poked and where: "Sam poked you · Tokyo layover".
+  const pokeText = wave ? pokeBody(pokeSenderName(await lookupSenderName(message.sender_id)), row.meta) : null;
   const objects = recipients.map((userId) => ({
     user_id: userId,
     type: 'message',
-    title: wave ? 'Poke' : 'New message',
-    body: wave ? 'Poked you' : 'New message',
+    title: wave ? POKE_TITLE : 'New message',
+    body: pokeText ?? 'New message',
     payload: {
       thread_id: message.thread_id,
       message_id: message.id,
       sender_id: message.sender_id,
+      ...(wave ? { poke: true } : {}),
     },
   }));
 
@@ -69,7 +75,7 @@ async function notifyMessageParticipants(message: MessageRow) {
         title: object.title,
         body: object.body,
         data: {
-          type: 'message',
+          type: wave ? 'poke' : 'message',
           threadId: message.thread_id,
           url: `crewup://messages/${message.thread_id}`,
         },

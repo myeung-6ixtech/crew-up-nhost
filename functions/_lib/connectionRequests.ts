@@ -2,12 +2,18 @@ import { sendPushNotices } from './expoPush.js';
 import { graphqlRaw } from './graphql.js';
 import { normalizeFriendId } from './friendId.js';
 import { recomputeMatchesForUsers } from './tripMatching.js';
+import { POKE_TITLE, pokeBody, pokeSenderName } from './pokeNotice.js';
+export { relationshipFrom, type Relationship } from './relationship.js';
 
 export { formatFriendIdForDisplay, normalizeFriendId } from './friendId.js';
 
 export type FriendProfilePreview = {
   user_id: string;
   display_name: string;
+  preferred_name?: string | null;
+  crew_role?: string | null;
+  airline_id?: string | null;
+  base_airport_iata?: string | null;
   role_type?: string | null;
   base_airport?: string | null;
   avatar_file_id?: string | null;
@@ -57,8 +63,12 @@ export async function lookupProfileByFriendId(
         ) {
           user_id
           display_name
+          preferred_name
+          crew_role
+          airline_id
           role_type
           base_airport
+          base_airport_iata
           avatar_file_id
           friend_id
           is_verified
@@ -69,6 +79,26 @@ export async function lookupProfileByFriendId(
   );
 
   return data.profiles[0] ?? null;
+}
+
+/** Name for notification copy. Admin read; returns nothing on failure so a notice still goes out. */
+export async function lookupSenderName(userId: string): Promise<{ preferred_name?: string | null; display_name?: string | null } | null> {
+  try {
+    const data = await graphqlRaw<{ profiles_by_pk: { preferred_name?: string | null; display_name?: string | null } | null }>(
+      `
+        query SenderName($userId: uuid!) {
+          profiles_by_pk(user_id: $userId) {
+            preferred_name
+            display_name
+          }
+        }
+      `,
+      { userId },
+    );
+    return data.profiles_by_pk;
+  } catch {
+    return null;
+  }
 }
 
 export async function lookupProfileByUserId(
@@ -133,6 +163,28 @@ export async function getPairConnection(
   return data.connections[0] ?? null;
 }
 
+/** Friend requests one person can send per hour (Crew ID, QR or Connect). Past this: RATE_LIMITED (429). */
+export const FRIEND_REQUESTS_PER_HOUR = 20;
+
+export async function assertRequestRateLimit(requesterId: string, nowMs: number = Date.now()): Promise<void> {
+  const since = new Date(nowMs - 60 * 60 * 1000).toISOString();
+  const data = await graphqlRaw<{ connections_aggregate: { aggregate: { count: number } } }>(
+    `
+      query RecentRequests($requesterId: uuid!, $since: timestamptz!) {
+        connections_aggregate(where: { requester_id: { _eq: $requesterId }, created_at: { _gte: $since } }) {
+          aggregate {
+            count
+          }
+        }
+      }
+    `,
+    { requesterId, since },
+  );
+  if (data.connections_aggregate.aggregate.count >= FRIEND_REQUESTS_PER_HOUR) {
+    throw new ConnectionRequestError('RATE_LIMITED', 'Too many friend requests. Try again later.', 429);
+  }
+}
+
 export async function isBlockedBetween(userA: string, userB: string): Promise<boolean> {
   const data = await graphqlRaw<{ user_blocks: Array<{ id: string }> }>(
     `
@@ -171,6 +223,8 @@ async function insertConnectionNotification(input: {
   connectionId: string;
   requesterId: string;
   message?: string | null;
+  /** A poke from Discover / Matches: notified as a poke, not a plain request. */
+  poke?: { title: string; body: string; meta: WaveMeta } | null;
 }) {
   await graphqlRaw(
     `
@@ -184,11 +238,12 @@ async function insertConnectionNotification(input: {
       object: {
         user_id: input.addresseeId,
         type: 'connection_request',
-        title: 'Connection request',
-        body: input.message?.trim() || 'Someone wants to connect with you on CrewUp.',
+        title: input.poke?.title ?? 'Connection request',
+        body: input.poke?.body ?? (input.message?.trim() || 'Someone wants to connect with you on CrewUp.'),
         payload: {
           connection_id: input.connectionId,
           requester_id: input.requesterId,
+          ...(input.poke ? { poke: true, wave_meta: input.poke.meta } : {}),
         },
       },
     },
@@ -281,6 +336,8 @@ export async function sendConnectionRequest(input: {
     return { connection, outcome: 'accepted' };
   }
 
+  await assertRequestRateLimit(requesterId);
+
   const inserted = await graphqlRaw<{ insert_connections_one: ConnectionRow | null }>(
     `
       mutation InsertConnection($object: connections_insert_input!) {
@@ -309,19 +366,24 @@ export async function sendConnectionRequest(input: {
   }
 
   try {
+    // A poke reads as a poke ("Sam poked you · Tokyo layover"), in the notifications list and the push.
+    const poke = waveMeta
+      ? { title: POKE_TITLE, body: pokeBody(pokeSenderName(await lookupSenderName(requesterId)), waveMeta), meta: waveMeta }
+      : null;
     await insertConnectionNotification({
       addresseeId,
       connectionId: connection.id,
       requesterId,
       message,
+      poke,
     });
     await sendPushNotices([
       {
         userId: addresseeId,
-        title: 'Connection request',
-        body: 'Someone wants to connect',
+        title: poke?.title ?? 'Connection request',
+        body: poke?.body ?? 'Someone wants to connect',
         data: {
-          type: 'connection_request',
+          type: poke ? 'poke' : 'connection_request',
           connectionId: connection.id,
           requesterId,
           url: `crewup://network/${requesterId}`,
