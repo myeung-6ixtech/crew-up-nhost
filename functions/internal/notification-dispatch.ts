@@ -42,8 +42,8 @@ async function notifyMessageParticipants(message: MessageRow) {
   const objects = recipients.map((userId) => ({
     user_id: userId,
     type: 'message',
-    title: wave ? 'Layover wave' : 'New message',
-    body: wave ? 'Waved you' : 'New message',
+    title: wave ? 'Poke' : 'New message',
+    body: wave ? 'Poked you' : 'New message',
     payload: {
       thread_id: message.thread_id,
       message_id: message.id,
