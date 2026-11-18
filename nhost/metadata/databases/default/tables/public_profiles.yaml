@@ -66,6 +66,13 @@ computed_fields:
         schema: public
       session_argument: hasura_session
     comment: show_gender for the caller's own row; null for everyone else
+  - name: own_friend_id
+    definition:
+      function:
+        name: profile_own_friend_id
+        schema: public
+      session_argument: hasura_session
+    comment: Crew ID for the caller's own row; null for everyone else
   - name: onboarding_completed
     definition:
       function:
@@ -88,7 +95,6 @@ select_permissions:
         - notification_mode
         - is_verified
         - avatar_file_id
-        - friend_id
         - full_name
         - full_name_native
         - preferred_name
@@ -108,6 +114,7 @@ select_permissions:
         - own_hometown_longitude
         - visible_gender
         - own_show_gender
+        - own_friend_id
         - onboarding_completed
       filter:
         _or:
