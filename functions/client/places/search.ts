@@ -54,11 +54,18 @@ async function autocomplete(apiKey: string, query: string, city: string, session
     }),
   });
   if (!response.ok) {
+    // Google's reason (API not enabled, key restricted, billing off) is in the body; log it, never return it.
+    const reason = await response.text().catch(() => '');
+    console.error(JSON.stringify({ scope: 'client/places/search', event: 'google_error', status: response.status, reason: reason.slice(0, 400) }));
     throw new Error(`places_autocomplete_${response.status}`);
   }
   const body = (await response.json()) as {
     suggestions?: { placePrediction?: PlacePrediction }[];
   };
+  if (!body.suggestions?.length) {
+    // An empty answer for a real place name usually means the wrong API or project behind the key.
+    console.warn(JSON.stringify({ scope: 'client/places/search', event: 'google_empty', inputLength: input.length, keys: Object.keys(body) }));
+  }
   const places = [];
   for (const suggestion of body.suggestions ?? []) {
     const prediction = suggestion.placePrediction;
@@ -85,6 +92,8 @@ async function details(apiKey: string, placeId: string, sessionToken: string) {
     },
   });
   if (!response.ok) {
+    const reason = await response.text().catch(() => '');
+    console.error(JSON.stringify({ scope: 'client/places/search', event: 'google_details_error', status: response.status, reason: reason.slice(0, 400) }));
     throw new Error(`places_details_${response.status}`);
   }
   const body = (await response.json()) as {
