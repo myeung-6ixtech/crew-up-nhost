@@ -51,6 +51,7 @@ insert_permissions:
         - reported_event_id
         - reason
         - details
+        - context
 update_permissions:
   - role: moderator
     permission:

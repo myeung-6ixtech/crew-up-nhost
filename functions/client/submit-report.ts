@@ -4,7 +4,7 @@ import {
   requireAuthorization,
   unauthorized,
 } from '../_lib/auth.js';
-import { graphqlAsUser } from '../_lib/graphql.js';
+import { graphqlAsUser, graphqlRaw } from '../_lib/graphql.js';
 import { sendStaffAlert } from '../_lib/staffAlert.js';
 
 interface SubmitReportInput {
@@ -13,6 +13,8 @@ interface SubmitReportInput {
   reportedUserId?: string | null;
   reportedMessageId?: string | null;
   reportedEventId?: string | null;
+  /** From the app: where it was reported (profile, chat, event, crossing_paths) and the relationship. */
+  context?: Record<string, unknown> | null;
 }
 
 interface ActionPayload {
@@ -35,6 +37,33 @@ export default async function submitReport(req: Request, res: Response) {
       return badRequest(res, 'At least one report target is required');
     }
 
+    // Snapshot of the reported profile as it is now (read as the service role; the reporter may be blocked by them).
+    let reportedProfile: Record<string, unknown> | null = null;
+    if (input.reportedUserId) {
+      try {
+        const snap = await graphqlRaw<{ profiles_by_pk: Record<string, unknown> | null }>(
+          `query ReportedProfile($id: uuid!) {
+            profiles_by_pk(user_id: $id) {
+              display_name preferred_name username crew_role airline_id base_airport_iata avatar_file_id
+            }
+          }`,
+          { id: input.reportedUserId },
+        );
+        reportedProfile = snap.profiles_by_pk;
+      } catch (error) {
+        console.error('client/submit-report: profile snapshot failed', error);
+      }
+    }
+    const clientContext = input.context && typeof input.context === 'object' && !Array.isArray(input.context) ? input.context : {};
+    const context = {
+      source: typeof clientContext.source === 'string' ? clientContext.source.slice(0, 40) : null,
+      relationship: typeof clientContext.relationship === 'string' ? clientContext.relationship.slice(0, 40) : null,
+      match: typeof clientContext.match === 'string' ? clientContext.match.slice(0, 200) : null,
+      also_blocked: clientContext.also_blocked === true,
+      reported_profile: reportedProfile,
+      reported_at: new Date().toISOString(),
+    };
+
     const data = await graphqlAsUser<{
       insert_reports_one: { id: string; status: string } | null;
     }>(
@@ -54,6 +83,7 @@ export default async function submitReport(req: Request, res: Response) {
           reported_user_id: input.reportedUserId ?? null,
           reported_message_id: input.reportedMessageId ?? null,
           reported_event_id: input.reportedEventId ?? null,
+          context,
         },
       },
     );

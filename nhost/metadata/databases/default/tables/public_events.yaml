@@ -42,6 +42,21 @@ select_permissions:
       columns: '*'
       filter:
         _and:
+          # Hidden when either side has blocked the other (your own events always show).
+          - _or:
+              - creator_id:
+                  _eq: X-Hasura-User-Id
+              - _and:
+                  - _not:
+                      creator:
+                        blocks_given:
+                          blocked_id:
+                            _eq: X-Hasura-User-Id
+                  - _not:
+                      creator:
+                        blocks_received:
+                          blocker_id:
+                            _eq: X-Hasura-User-Id
           - _and:
               - _or:
                   - host_type:
