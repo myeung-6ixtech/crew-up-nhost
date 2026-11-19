@@ -148,6 +148,9 @@ insert_permissions:
         - city
         - venue_name
         - venue_address
+        - venue_place_id
+        - venue_lat
+        - venue_lng
         - starts_at
         - ends_at
         - capacity
@@ -168,6 +171,9 @@ insert_permissions:
         - city
         - venue_name
         - venue_address
+        - venue_place_id
+        - venue_lat
+        - venue_lng
         - starts_at
         - ends_at
         - capacity
@@ -188,6 +194,9 @@ update_permissions:
         - city
         - venue_name
         - venue_address
+        - venue_place_id
+        - venue_lat
+        - venue_lng
         - starts_at
         - ends_at
         - capacity
@@ -241,6 +250,9 @@ update_permissions:
         - city
         - venue_name
         - venue_address
+        - venue_place_id
+        - venue_lat
+        - venue_lng
         - starts_at
         - ends_at
         - capacity
