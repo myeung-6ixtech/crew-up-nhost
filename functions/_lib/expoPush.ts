@@ -7,7 +7,10 @@ export type PushNotice = {
   title: string;
   body: string;
   data: Record<string, string>;
-  /** Immediate alerts skip people who chose the daily digest. */
+  /**
+   * Also send to people who chose the daily digest. Used for the digest itself, and for pokes: they are about a
+   * layover happening now, so a day later is too late. Everything else waits for the digest.
+   */
   includeDigest?: boolean;
 };
 

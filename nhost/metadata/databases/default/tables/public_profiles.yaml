@@ -212,6 +212,7 @@ update_permissions:
         - preferred_language
         - default_visibility
         - notification_mode
+        - time_zone
         - avatar_file_id
         - hometown_latitude
         - hometown_longitude

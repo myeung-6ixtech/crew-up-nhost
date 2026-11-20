@@ -1,6 +1,7 @@
 - name: notification_digest_daily
   webhook: '{{NHOST_FUNCTIONS_URL}}/internal/notification-dispatch'
-  schedule: 0 8 * * *
+  # Hourly: each run sends to the people for whom it is now 8 AM (their own time zone).
+  schedule: 0 * * * *
   include_in_metadata: true
   payload:
     mode: digest
@@ -12,7 +13,7 @@
   headers:
     - name: nhost-webhook-secret
       value_from_env: NHOST_WEBHOOK_SECRET
-  comment: Daily digest notifications for users with notification_mode=digest
+  comment: Daily digest at 8 AM local time for users with notification_mode=digest (runs hourly)
 - name: account_deletion_purge_daily
   webhook: '{{NHOST_FUNCTIONS_URL}}/internal/account-deletion-purge'
   schedule: 0 4 * * *

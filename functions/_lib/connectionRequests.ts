@@ -382,6 +382,8 @@ export async function sendConnectionRequest(input: {
         userId: addresseeId,
         title: poke?.title ?? 'Connection request',
         body: poke?.body ?? 'Someone wants to connect',
+        // Pokes are time-sensitive (a layover now), so they reach digest users too; a plain request waits.
+        includeDigest: Boolean(poke),
         data: {
           type: poke ? 'poke' : 'connection_request',
           connectionId: connection.id,

@@ -11,13 +11,10 @@ import { sendPushNotices } from '../_lib/expoPush.js';
 import { graphqlRaw } from '../_lib/graphql.js';
 import { lookupSenderName } from '../_lib/connectionRequests.js';
 import { POKE_TITLE, pokeBody, pokeSenderName } from '../_lib/pokeNotice.js';
+import { digestBody, digestDue, digestSince, digestZone } from '../_lib/digestTiming.js';
 
 interface ThreadParticipants {
   thread_participants: Array<{ user_id: string }>;
-}
-
-interface DigestProfiles {
-  profiles: Array<{ user_id: string }>;
 }
 
 async function notifyMessageParticipants(message: MessageRow) {
@@ -74,6 +71,7 @@ async function notifyMessageParticipants(message: MessageRow) {
         userId: object.user_id,
         title: object.title,
         body: object.body,
+        includeDigest: wave,
         data: {
           type: wave ? 'poke' : 'message',
           threadId: message.thread_id,
@@ -88,55 +86,93 @@ async function notifyMessageParticipants(message: MessageRow) {
   return { inserted: result.insert_notifications.affected_rows };
 }
 
+type DigestProfile = {
+  user_id: string;
+  time_zone: string | null;
+  last_digest_at: string | null;
+  base_airport_iata: string | null;
+};
+
+/**
+ * Hourly. For each digest user it is now 8 AM for (their device zone, else their base airport's, else UTC), and who
+ * hasn't had one in 20 hours: count notifications that are new since the last digest (not the digests themselves,
+ * no cap), and send one push if there are any.
+ */
 async function runDigestBatch() {
-  const profiles = await graphqlRaw<DigestProfiles>(
+  const now = new Date();
+  const { profiles } = await graphqlRaw<{ profiles: DigestProfile[] }>(
     `
       query DigestProfiles {
         profiles(where: { notification_mode: { _eq: "digest" } }) {
           user_id
+          time_zone
+          last_digest_at
+          base_airport_iata
         }
       }
     `,
   );
+  const airportCodes = [...new Set(profiles.map((profile) => profile.base_airport_iata).filter((code): code is string => Boolean(code)))];
+  const zones = new Map<string, string | null>();
+  if (airportCodes.length) {
+    const { airports } = await graphqlRaw<{ airports: Array<{ iata: string; tz: string | null }> }>(
+      `query AirportZones($codes: [String!]!) { airports(where: { iata: { _in: $codes } }) { iata tz } }`,
+      { codes: airportCodes },
+    );
+    for (const airport of airports) zones.set(airport.iata, airport.tz);
+  }
 
-  let inserted = 0;
-  for (const profile of profiles.profiles) {
-    const unread = await graphqlRaw<{ notifications: Array<{ id: string }> }>(
+  let sent = 0;
+  for (const profile of profiles) {
+    const zone = digestZone(profile.time_zone, profile.base_airport_iata ? zones.get(profile.base_airport_iata) : null);
+    if (!digestDue(now, zone, profile.last_digest_at)) continue;
+
+    const since = digestSince(now, profile.last_digest_at);
+    const counted = await graphqlRaw<{ notifications_aggregate: { aggregate: { count: number } } }>(
       `
-        query Unread($userId: uuid!) {
-          notifications(
-            where: { user_id: { _eq: $userId }, read_at: { _is_null: true } }
-            limit: 20
+        query NewSinceDigest($userId: uuid!, $since: timestamptz!) {
+          notifications_aggregate(
+            where: {
+              user_id: { _eq: $userId }
+              read_at: { _is_null: true }
+              created_at: { _gt: $since }
+              _not: { payload: { _contains: { mode: "digest" } } }
+            }
           ) {
-            id
+            aggregate {
+              count
+            }
           }
         }
       `,
-      { userId: profile.user_id },
+      { userId: profile.user_id, since },
     );
+    const count = counted.notifications_aggregate.aggregate.count;
+    if (count === 0) continue;
 
-    if (unread.notifications.length === 0) {
-      continue;
-    }
-
+    const body = digestBody(count);
+    // Saved already read: the digest is a nudge, not something else to clear, and never counted by the next one.
     await graphqlRaw(
       `
-        mutation DigestNotification($object: notifications_insert_input!) {
+        mutation DigestNotification($object: notifications_insert_input!, $userId: uuid!, $at: timestamptz!) {
           insert_notifications_one(object: $object) {
             id
+          }
+          update_profiles_by_pk(pk_columns: { user_id: $userId }, _set: { last_digest_at: $at }) {
+            user_id
           }
         }
       `,
       {
+        userId: profile.user_id,
+        at: now.toISOString(),
         object: {
           user_id: profile.user_id,
           type: 'beacon',
           title: 'Your CrewUp digest',
-          body: `You have ${unread.notifications.length} unread notifications`,
-          payload: {
-            mode: 'digest',
-            unread_count: unread.notifications.length,
-          },
+          body,
+          read_at: now.toISOString(),
+          payload: { mode: 'digest', new_count: count },
         },
       },
     );
@@ -146,7 +182,7 @@ async function runDigestBatch() {
         {
           userId: profile.user_id,
           title: 'Your CrewUp digest',
-          body: `You have ${unread.notifications.length} unread notifications`,
+          body,
           data: { type: 'beacon', url: 'crewup://messages' },
           includeDigest: true,
         },
@@ -154,11 +190,10 @@ async function runDigestBatch() {
     } catch (error) {
       console.error('notification-dispatch: digest push failed', error);
     }
-
-    inserted += 1;
+    sent += 1;
   }
 
-  return { digestUsers: profiles.profiles.length, inserted };
+  return { digestUsers: profiles.length, sent };
 }
 
 export default async function notificationDispatch(req: Request, res: Response) {

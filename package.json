@@ -15,6 +15,7 @@
     "test:trips": "node --experimental-strip-types --test scripts/trip-selection.test.mjs",
     "test:flights": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/flight-schedules.test.mjs",
     "test:connections": "node --experimental-strip-types --test scripts/connection-requests.test.mjs",
+    "test:digest": "node --experimental-strip-types --test scripts/digest-timing.test.mjs",
     "test:roster": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/roster-extraction.test.mjs",
     "test:onboarding": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/onboarding.test.mjs",
     "test:event-pin": "node --experimental-strip-types --import ./scripts/register-ts-resolve.mjs --test scripts/event-pin.test.mjs",

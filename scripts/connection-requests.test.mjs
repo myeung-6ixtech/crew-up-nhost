@@ -48,3 +48,22 @@ test('QR Add friend: relationship from the viewer’s side', () => {
   assert.equal(relationshipFrom('me', 'them', { status: 'pending', requester_id: 'them' }), 'pending_received');
   assert.equal(relationshipFrom('me', 'them', { status: 'declined', requester_id: 'them' }), 'none');
 });
+
+const { cleanUsernameQuery, containsPattern, createRateLimiter } = await import('../functions/_lib/crewSearch.ts');
+
+test('crew search: a leading @ and case are dropped; LIKE wildcards match literally', () => {
+  assert.equal(cleanUsernameQuery('  @Sam_K '), 'sam_k');
+  assert.equal(cleanUsernameQuery('@@muser yeung'), 'muser yeung');
+  assert.equal(cleanUsernameQuery('50%'), '50');
+  assert.equal(containsPattern('sam_k'), '%sam\\_k%');
+  assert.equal(cleanUsernameQuery(42), '');
+});
+
+test('crew search is rate limited per user', () => {
+  const allow = createRateLimiter(2, 1000);
+  assert.equal(allow('a', 0), true);
+  assert.equal(allow('a', 10), true);
+  assert.equal(allow('a', 20), false);
+  assert.equal(allow('b', 20), true);
+  assert.equal(allow('a', 1500), true);
+});
