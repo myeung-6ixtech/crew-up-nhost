@@ -104,12 +104,12 @@ export default async function friendsSearch(req: Request, res: Response) {
     const pattern = containsPattern(term);
     // As the caller: their profile permissions hide blocked people, unfinished and deleted accounts.
     const { profiles } = await graphqlAsUser<{ profiles: Row[] }>(
-      `query SearchCrew($me: uuid!, $pattern: String!, $limit: Int!) {
+      `query SearchCrew($me: uuid!, $pattern: String!, $handlePattern: citext!, $limit: Int!) {
         profiles(
           where: {
             user_id: { _neq: $me }
             _or: [
-              { username: { _ilike: $pattern } }
+              { username: { _ilike: $handlePattern } }
               { display_name: { _ilike: $pattern } }
               { preferred_name: { _ilike: $pattern } }
             ]
@@ -119,7 +119,8 @@ export default async function friendsSearch(req: Request, res: Response) {
         ) { ${PROFILE_FIELDS} }
       }`,
       authorization,
-      { me: userId, pattern, limit: MAX_RESULTS },
+      // username is citext, so it needs its own variable of that type (same pattern).
+      { me: userId, pattern, handlePattern: pattern, limit: MAX_RESULTS },
     );
     // Closest first: handle starts with the term, then name starts with it, then anywhere.
     const rank = (row: Row) =>
