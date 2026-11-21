@@ -1,5 +1,5 @@
 import { sendPushNotices } from './expoPush.js';
-import { graphqlRaw } from './graphql.js';
+import { graphqlAsAdmin, graphqlRaw } from './graphql.js';
 import { normalizeFriendId } from './friendId.js';
 import { recomputeMatchesForUsers } from './tripMatching.js';
 import { POKE_TITLE, pokeBody, pokeSenderName } from './pokeNotice.js';
@@ -168,7 +168,8 @@ export const FRIEND_REQUESTS_PER_HOUR = 20;
 
 export async function assertRequestRateLimit(requesterId: string, nowMs: number = Date.now()): Promise<void> {
   const since = new Date(nowMs - 60 * 60 * 1000).toISOString();
-  const data = await graphqlRaw<{ connections_aggregate: { aggregate: { count: number } } }>(
+  // Counting needs aggregates, which the service role doesn't have: run as admin (server-side, fixed query).
+  const data = await graphqlAsAdmin<{ connections_aggregate: { aggregate: { count: number } } }>(
     `
       query RecentRequests($requesterId: uuid!, $since: timestamptz!) {
         connections_aggregate(where: { requester_id: { _eq: $requesterId }, created_at: { _gte: $since } }) {
@@ -179,6 +180,7 @@ export async function assertRequestRateLimit(requesterId: string, nowMs: number 
       }
     `,
     { requesterId, since },
+    'admin',
   );
   if (data.connections_aggregate.aggregate.count >= FRIEND_REQUESTS_PER_HOUR) {
     throw new ConnectionRequestError('RATE_LIMITED', 'Too many friend requests. Try again later.', 429);

@@ -8,7 +8,7 @@ import {
   type MessageRow,
 } from '../_lib/auth.js';
 import { sendPushNotices } from '../_lib/expoPush.js';
-import { graphqlRaw } from '../_lib/graphql.js';
+import { graphqlAsAdmin, graphqlRaw } from '../_lib/graphql.js';
 import { lookupSenderName } from '../_lib/connectionRequests.js';
 import { POKE_TITLE, pokeBody, pokeSenderName } from '../_lib/pokeNotice.js';
 import { digestBody, digestDue, digestSince, digestZone } from '../_lib/digestTiming.js';
@@ -128,7 +128,8 @@ async function runDigestBatch() {
     if (!digestDue(now, zone, profile.last_digest_at)) continue;
 
     const since = digestSince(now, profile.last_digest_at);
-    const counted = await graphqlRaw<{ notifications_aggregate: { aggregate: { count: number } } }>(
+    // Counting needs aggregates, which the service role doesn't have.
+    const counted = await graphqlAsAdmin<{ notifications_aggregate: { aggregate: { count: number } } }>(
       `
         query NewSinceDigest($userId: uuid!, $since: timestamptz!) {
           notifications_aggregate(
@@ -146,6 +147,7 @@ async function runDigestBatch() {
         }
       `,
       { userId: profile.user_id, since },
+      'admin',
     );
     const count = counted.notifications_aggregate.aggregate.count;
     if (count === 0) continue;

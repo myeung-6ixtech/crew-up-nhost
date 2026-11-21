@@ -1,13 +1,14 @@
-import { graphqlRaw } from './graphql.js';
+import { graphqlAsAdmin } from './graphql.js';
 
 /**
- * Block and unfriend, run as the service role after the caller is authenticated. Both are idempotent: repeating one
+ * Block and unfriend, run as admin after the caller is authenticated (the service role can't delete connections or
+ * insert blocks). Both are idempotent: repeating one
  * leaves the same state and succeeds.
  */
 
 /** Blocks `blockedId` for `blockerId`, and ends any friendship or pending request between them in either direction. */
 export async function blockPair(blockerId: string, blockedId: string, reason?: string | null): Promise<void> {
-  await graphqlRaw(
+  await graphqlAsAdmin(
     `
       mutation BlockPair($blocker: uuid!, $blocked: uuid!, $reason: String) {
         insert_user_blocks_one(
@@ -29,12 +30,13 @@ export async function blockPair(blockerId: string, blockedId: string, reason?: s
       }
     `,
     { blocker: blockerId, blocked: blockedId, reason: reason?.slice(0, 200) ?? null },
+    'admin',
   );
 }
 
 /** Ends an accepted friendship between the two, either direction. No friendship: nothing to do. */
 export async function unfriendPair(userId: string, otherId: string): Promise<number> {
-  const data = await graphqlRaw<{ delete_connections: { affected_rows: number } }>(
+  const data = await graphqlAsAdmin<{ delete_connections: { affected_rows: number } }>(
     `
       mutation UnfriendPair($me: uuid!, $other: uuid!) {
         delete_connections(
@@ -51,6 +53,7 @@ export async function unfriendPair(userId: string, otherId: string): Promise<num
       }
     `,
     { me: userId, other: otherId },
+    'admin',
   );
   return data.delete_connections.affected_rows;
 }
